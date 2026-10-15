@@ -37,14 +37,52 @@ dotnet ef migrations add <Naam> -p src/Wolsels.Api -o Data/Migrations
 | `Auth__RateLimitPerHour`       | `60`                          | Max. auth-verzoeken per IP per uur         |
 | `Auth__PasswordResetPerIpPerHour` / `PerEmailPerHour` | `5` / `3` | Limieten herstelmails          |
 | `Auth__MaxFailedAccessAttempts` / `LockoutMinutes` | `5` / `15` | Accountblokkering                   |
+| `Auth__AdminEmail`             | –                             | Dit account wordt altijd beheerder         |
+
+## Huishoudens
+
+Gegevens (wol, mengsels, dieren, locaties, oogsten) horen bij een **huishouden**. Meerdere accounts kunnen
+één huishouden delen, en een account kan lid zijn van meerdere huishoudens. De frontend stuurt per verzoek
+`X-Household: <id>` mee; de backend controleert bij elk verzoek of de gebruiker daar lid van is (403
+`household-access` als dat niet zo is). Zonder header geldt het eerste huishouden van de gebruiker.
+
+| Endpoint                                   | Omschrijving                                                 |
+|--------------------------------------------|--------------------------------------------------------------|
+| `GET/POST /api/households`                 | Mijn huishoudens / nieuw huishouden aanmaken                 |
+| `GET/PUT /api/household`                   | Actief huishouden: leden, open uitnodigingen / naam wijzigen |
+| `POST /api/household/invites`              | Uitnodigingslink maken (eenmalig, 7 dagen; alleen de hash wordt opgeslagen) |
+| `DELETE /api/household/invites/{id}`       | Uitnodiging intrekken                                        |
+| `GET /api/household/invites/{token}`       | Info over een uitnodiging (zonder login)                     |
+| `POST /api/household/join`                 | Lid worden met een uitnodiging                               |
+| `POST /api/household/leave`                | Actief huishouden verlaten (niet als laatste lid)            |
+| `DELETE /api/household/members/{userId}`   | Lid verwijderen                                              |
+
+Registreren met `?invite=<token>` werkt ook als registreren verder uit staat.
+
+## Beheer
+
+Het eerste account is **beheerder** (bij bestaande installaties: de maker van het eerste huishouden).
+`Auth__AdminEmail` maakt een account bij het opstarten altijd beheerder, om toegang te herstellen.
+Rechten worden per verzoek gecontroleerd. Beheerders beheren accounts, maar zien geen gegevens van
+huishoudens.
+
+| Endpoint                                     | Omschrijving                                         |
+|----------------------------------------------|------------------------------------------------------|
+| `GET /api/admin/users`                       | Alle accounts met 2FA-status, blokkade, huishoudens  |
+| `POST /api/admin/users/{id}/block`/`unblock` | Blokkeren (sessie vervalt direct) / deblokkeren      |
+| `POST /api/admin/users/{id}/reset-2fa`       | 2FA uitschakelen (telefoon en herstelcodes kwijt)    |
+| `POST /api/admin/users/{id}/password-reset`  | Herstellink om zelf te delen (ook zonder mailserver) |
+| `PUT /api/admin/users/{id}/admin`            | Beheerder maken/afnemen (laatste beheerder blijft)   |
+| `GET /api/admin/users/{id}/delete-preview`   | Welke huishoudens (alleen dit lid) meeverdwijnen     |
+| `DELETE /api/admin/users/{id}`               | Account verwijderen                                  |
 
 ## Accounts en 2FA
 
 Gebaseerd op ASP.NET Core Identity met een sessiecookie (`wolsels.auth`, HttpOnly, SameSite=Strict).
-Elke gebruiker ziet alleen zijn eigen gegevens (EF Core query filters op `OwnerId`). Wachtwoorden
+Elk huishouden ziet alleen zijn eigen gegevens (EF Core query filters op `HouseholdId`). Wachtwoorden
 minimaal 10 tekens; na 5 foute pogingen (wachtwoord of 2FA-code) is een account 15 minuten geblokkeerd.
 Daarnaast geldt een limiet per IP-adres per minuut en per uur op alle gevoelige auth-endpoints.
-Gegevens van vóór de invoering van accounts gaan naar het eerste geregistreerde account.
+Gegevens van vóór de invoering van accounts gaan naar het eerste huishouden.
 
 | Endpoint                                 | Omschrijving                                                     |
 |------------------------------------------|------------------------------------------------------------------|

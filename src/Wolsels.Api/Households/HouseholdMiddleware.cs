@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Identity;
+using Wolsels.Api.Admin;
 using Wolsels.Api.Services;
 
 namespace Wolsels.Api.Households;
@@ -12,10 +14,21 @@ public class HouseholdMiddleware(RequestDelegate next)
 {
     public const string HeaderName = "X-Household";
 
-    public async Task InvokeAsync(HttpContext context, ICurrentUser currentUser, HouseholdService households)
+    public async Task InvokeAsync(HttpContext context, ICurrentUser currentUser, HouseholdService households,
+        UserManager<IdentityUser> users, SignInManager<IdentityUser> signIn)
     {
         if (currentUser is HttpCurrentUser user && user.UserId is { } userId)
         {
+            // Verwijderde of door een beheerder geblokkeerde accounts verliezen direct hun sessie.
+            var account = await users.FindByIdAsync(userId);
+            if (account is null || AccountBlocking.IsBlocked(account))
+            {
+                await signIn.SignOutAsync();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await context.Response.WriteAsJsonAsync(new { status = 401, title = "Je account is geblokkeerd of bestaat niet meer." });
+                return;
+            }
+
             int? requested = null;
             if (context.Request.Headers.TryGetValue(HeaderName, out var header))
             {

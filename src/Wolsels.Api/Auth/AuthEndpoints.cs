@@ -27,7 +27,7 @@ public static class AuthEndpoints
 
     public sealed record ChangePasswordRequest(string OldPassword, string NewPassword);
 
-    public sealed record MeDto(string Email, bool TwoFactorEnabled, int RecoveryCodesLeft);
+    public sealed record MeDto(string Email, bool TwoFactorEnabled, int RecoveryCodesLeft, bool IsAdmin);
 
     public static void MapAuthEndpoints(this WebApplication app)
     {
@@ -56,7 +56,15 @@ public static class AuthEndpoints
                 return Results.Problem(statusCode: StatusCodes.Status403Forbidden,
                     title: "Registreren is uitgeschakeld. Vraag een lid om een uitnodiging.");
 
-            return await next(context);
+            var result = await next(context);
+            // Het allereerste account wordt beheerder van de site.
+            if (context.Arguments.OfType<Microsoft.AspNetCore.Identity.Data.RegisterRequest>().FirstOrDefault() is { } request
+                && await users.FindByEmailAsync(request.Email) is { } created
+                && (await users.GetUsersInRoleAsync(Admin.AdminAuthorization.Role)).Count == 0)
+            {
+                await users.AddToRoleAsync(created, Admin.AdminAuthorization.Role);
+            }
+            return result;
         });
 
         auth.MapGet("/options", (IOptions<AuthOptions> options, UserManager<IdentityUser> users, IMailSender mail,
@@ -74,11 +82,8 @@ public static class AuthEndpoints
                 if (await users.FindByEmailAsync(request.Email.Trim()) is { Email: { } email } user
                     && TryCountMail(cache, clock, email, authOptions.Value.PasswordResetPerEmailPerHour))
                 {
-                    var token = await users.GeneratePasswordResetTokenAsync(user);
-                    var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
                     // Nooit de Host-header van het verzoek gebruiken: die kan vervalst zijn (password reset poisoning).
-                    var baseUrl = app.Value.PublicUrl!.TrimEnd('/');
-                    var link = $"{baseUrl}/wachtwoord-herstellen?email={Uri.EscapeDataString(email)}&code={code}";
+                    var link = app.Value.PublicUrl!.TrimEnd('/') + await PasswordResetLinks.CreatePathAsync(users, user);
                     try
                     {
                         await mail.SendAsync(email, "Wachtwoord herstellen voor Wolsels",
@@ -134,7 +139,8 @@ public static class AuthEndpoints
                 return Results.Ok(new MeDto(
                     user.Email ?? user.UserName ?? "",
                     await users.GetTwoFactorEnabledAsync(user),
-                    await users.CountRecoveryCodesAsync(user)));
+                    await users.CountRecoveryCodesAsync(user),
+                    await users.IsInRoleAsync(user, Admin.AdminAuthorization.Role)));
             })
             .RequireAuthorization();
 

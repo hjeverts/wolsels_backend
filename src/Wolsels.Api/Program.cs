@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Wolsels.Api.Admin;
 using Wolsels.Api.Auth;
 using Wolsels.Api.Data;
 using Wolsels.Api.Households;
@@ -28,6 +29,7 @@ builder.Services.AddDbContext<WolselsDbContext>(o =>
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 var authOptions = builder.Configuration.GetSection(AuthOptions.SectionName).Get<AuthOptions>() ?? new AuthOptions();
 builder.Services.AddAuthorization();
+builder.Services.AddAdminAuthorization();
 builder.Services
     .AddIdentityApiEndpoints<IdentityUser>(o =>
     {
@@ -42,6 +44,7 @@ builder.Services
         o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(authOptions.LockoutMinutes);
         o.Lockout.AllowedForNewUsers = true;
     })
+    .AddRoles<IdentityRole>()
     .AddErrorDescriber<DutchIdentityErrorDescriber>()
     .AddEntityFrameworkStores<WolselsDbContext>();
 builder.Services.ConfigureApplicationCookie(o =>
@@ -87,6 +90,8 @@ using (var scope = app.Services.CreateScope())
     var dataSource = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(db.Database.GetConnectionString()).DataSource;
     if (Path.GetDirectoryName(Path.GetFullPath(dataSource)) is { } dir) Directory.CreateDirectory(dir);
     db.Database.Migrate();
+    await AdminAuthorization.EnsureAdminsAsync(scope.ServiceProvider, authOptions.AdminEmail,
+        scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Wolsels.Admin"));
 }
 
 app.UseForwardedHeaders();

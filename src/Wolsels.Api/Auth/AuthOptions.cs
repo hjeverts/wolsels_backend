@@ -23,4 +23,7 @@ public class AuthOptions
     public int MaxFailedAccessAttempts { get; set; } = 5;
 
     public int LockoutMinutes { get; set; } = 15;
+
+    /// <summary>Dit account wordt bij het opstarten altijd beheerder (om toegang te herstellen).</summary>
+    public string? AdminEmail { get; set; }
 }

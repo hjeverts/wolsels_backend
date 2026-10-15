@@ -148,6 +148,37 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
             await CreateHouseholdAsync(userId, null, ct);
     }
 
+    /// <summary>Verwijdert een huishouden met al zijn gegevens (bij het verwijderen van het laatste lid).</summary>
+    public async Task DeleteHouseholdAsync(int householdId, CancellationToken ct)
+    {
+        // Volgorde i.v.m. verwijzingen: oogsten -> mengsels (componenten via cascade) -> dieren -> locaties -> wol.
+        await db.Harvests.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);
+        await db.Blends.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);
+        await db.Animals.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);
+        await db.Locations.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);
+        await db.Wools.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);
+        await db.Households.Where(h => h.Id == householdId).ExecuteDeleteAsync(ct);
+    }
+
+    /// <summary>Huishoudens waarvan de gebruiker het enige lid is, met het aantal gegevens erin.</summary>
+    public async Task<List<(Household Household, int Items)>> SoleHouseholdsAsync(string userId, CancellationToken ct)
+    {
+        var ids = await db.HouseholdMembers.Where(m => m.UserId == userId)
+            .Where(m => !db.HouseholdMembers.Any(o => o.HouseholdId == m.HouseholdId && o.UserId != userId))
+            .Select(m => m.HouseholdId).ToListAsync(ct);
+        var result = new List<(Household, int)>();
+        foreach (var id in ids)
+        {
+            var items = await db.Wools.IgnoreQueryFilters().CountAsync(e => e.HouseholdId == id, ct)
+                + await db.Blends.IgnoreQueryFilters().CountAsync(e => e.HouseholdId == id, ct)
+                + await db.Animals.IgnoreQueryFilters().CountAsync(e => e.HouseholdId == id, ct)
+                + await db.Locations.IgnoreQueryFilters().CountAsync(e => e.HouseholdId == id, ct)
+                + await db.Harvests.IgnoreQueryFilters().CountAsync(e => e.HouseholdId == id, ct);
+            result.Add((await db.Households.FirstAsync(h => h.Id == id, ct), items));
+        }
+        return result;
+    }
+
     private static string Hash(string token) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }
