@@ -1,10 +1,10 @@
 namespace Wolsels.Api.Domain;
 
 /// <summary>Een locatie (stal, hok, weide) waar dieren gehouden worden.</summary>
-public class Location : IOwned
+public class Location : IHouseholdData
 {
     public int Id { get; set; }
-    public string OwnerId { get; set; } = "";
+    public int HouseholdId { get; set; }
     public required string Name { get; set; }
     public string? Notes { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -12,10 +12,10 @@ public class Location : IOwned
 }
 
 /// <summary>Een wolproducerend dier, bv. een angorakonijn.</summary>
-public class Animal : IOwned
+public class Animal : IHouseholdData
 {
     public int Id { get; set; }
-    public string OwnerId { get; set; } = "";
+    public int HouseholdId { get; set; }
     public required string Name { get; set; }
     /// <summary>Diersoort, bv. Konijn, Schaap, Alpaca.</summary>
     public required string Species { get; set; }
@@ -35,10 +35,10 @@ public class Animal : IOwned
 /// Een oogst van ruwe wol. Wordt geboekt op een dier, of op een locatie wanneer er geen
 /// afzonderlijke dieren worden bijgehouden.
 /// </summary>
-public class Harvest : IOwned
+public class Harvest : IHouseholdData
 {
     public int Id { get; set; }
-    public string OwnerId { get; set; } = "";
+    public int HouseholdId { get; set; }
     public DateOnly Date { get; set; }
     public int? AnimalId { get; set; }
     public Animal? Animal { get; set; }

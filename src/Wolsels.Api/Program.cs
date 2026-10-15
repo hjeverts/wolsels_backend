@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Wolsels.Api.Auth;
 using Wolsels.Api.Data;
+using Wolsels.Api.Households;
 using Wolsels.Api.Mail;
 using Wolsels.Api.Services;
 
@@ -19,6 +20,7 @@ builder.Services.AddHealthChecks().AddDbContextCheck<WolselsDbContext>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
+builder.Services.AddScoped<HouseholdService>();
 builder.Services.AddDbContext<WolselsDbContext>(o =>
     o.UseSqlite(builder.Configuration.GetConnectionString("Wolsels")));
 
@@ -97,6 +99,7 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseRateLimiter();
+app.UseMiddleware<HouseholdMiddleware>();
 app.UseAuthorization();
 
 app.MapAuthEndpoints();

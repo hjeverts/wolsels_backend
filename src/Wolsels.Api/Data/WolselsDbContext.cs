@@ -10,7 +10,7 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
     : IdentityDbContext<IdentityUser>(options)
 {
     /// <summary>Wordt per request geëvalueerd in de query filters hieronder.</summary>
-    private string? CurrentUserId => currentUser?.UserId;
+    private int? CurrentHouseholdId => currentUser?.HouseholdId;
 
     public DbSet<Wool> Wools => Set<Wool>();
     public DbSet<Blend> Blends => Set<Blend>();
@@ -18,6 +18,9 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Animal> Animals => Set<Animal>();
     public DbSet<Harvest> Harvests => Set<Harvest>();
+    public DbSet<Household> Households => Set<Household>();
+    public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
+    public DbSet<HouseholdInvite> HouseholdInvites => Set<HouseholdInvite>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -31,24 +34,42 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
     {
         base.OnModelCreating(modelBuilder);
 
-        // Elke gebruiker ziet alleen zijn eigen gegevens.
-        modelBuilder.Entity<Wool>().HasQueryFilter(e => e.OwnerId == CurrentUserId);
-        modelBuilder.Entity<Blend>().HasQueryFilter(e => e.OwnerId == CurrentUserId);
-        modelBuilder.Entity<Location>().HasQueryFilter(e => e.OwnerId == CurrentUserId);
-        modelBuilder.Entity<Animal>().HasQueryFilter(e => e.OwnerId == CurrentUserId);
-        modelBuilder.Entity<Harvest>().HasQueryFilter(e => e.OwnerId == CurrentUserId);
+        // Elk huishouden ziet alleen zijn eigen gegevens.
+        modelBuilder.Entity<Wool>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
+        modelBuilder.Entity<Blend>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
+        modelBuilder.Entity<Location>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
+        modelBuilder.Entity<Animal>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
+        modelBuilder.Entity<Harvest>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
         // Componenten zijn alleen bereikbaar via hun (gefilterde) mengsel.
         modelBuilder.Entity<BlendComponent>()
             .HasQueryFilter(c => Blends.Any(b => b.Id == c.BlendId));
 
-        foreach (var type in modelBuilder.Model.GetEntityTypes().Where(t => typeof(IOwned).IsAssignableFrom(t.ClrType)))
+        foreach (var type in modelBuilder.Model.GetEntityTypes().Where(t => typeof(IHouseholdData).IsAssignableFrom(t.ClrType)))
         {
-            modelBuilder.Entity(type.ClrType, e =>
-            {
-                e.Property(nameof(IOwned.OwnerId)).HasMaxLength(450);
-                e.HasIndex(nameof(IOwned.OwnerId));
-            });
+            modelBuilder.Entity(type.ClrType).HasIndex(nameof(IHouseholdData.HouseholdId));
         }
+
+        modelBuilder.Entity<Household>(e =>
+        {
+            e.Property(h => h.Name).HasMaxLength(100);
+            e.Property(h => h.CreatedByUserId).HasMaxLength(450);
+        });
+        modelBuilder.Entity<HouseholdMember>(e =>
+        {
+            e.HasKey(m => new { m.UserId, m.HouseholdId });
+            e.Property(m => m.UserId).HasMaxLength(450);
+            e.HasOne(m => m.Household).WithMany().HasForeignKey(m => m.HouseholdId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<IdentityUser>().WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(m => m.HouseholdId);
+        });
+        modelBuilder.Entity<HouseholdInvite>(e =>
+        {
+            e.Property(i => i.TokenHash).HasMaxLength(64);
+            e.HasIndex(i => i.TokenHash).IsUnique();
+            e.Property(i => i.CreatedByUserId).HasMaxLength(450);
+            e.Property(i => i.UsedByUserId).HasMaxLength(450);
+            e.HasOne<Household>().WithMany().HasForeignKey(i => i.HouseholdId).OnDelete(DeleteBehavior.Cascade);
+        });
 
         modelBuilder.Entity<Wool>(e =>
         {
@@ -136,13 +157,13 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
-    /// <summary>Nieuwe gegevens krijgen automatisch de ingelogde gebruiker als eigenaar.</summary>
+    /// <summary>Nieuwe gegevens horen automatisch bij het huishouden van de ingelogde gebruiker.</summary>
     private void AssignOwner()
     {
-        foreach (var entry in ChangeTracker.Entries<IOwned>().Where(e => e.State == EntityState.Added && e.Entity.OwnerId == ""))
+        foreach (var entry in ChangeTracker.Entries<IHouseholdData>().Where(e => e.State == EntityState.Added && e.Entity.HouseholdId == 0))
         {
-            entry.Entity.OwnerId = CurrentUserId
-                ?? throw new InvalidOperationException("Opslaan van gegevens vereist een ingelogde gebruiker.");
+            entry.Entity.HouseholdId = CurrentHouseholdId
+                ?? throw new InvalidOperationException("Opslaan van gegevens vereist een ingelogde gebruiker met een huishouden.");
         }
     }
 }

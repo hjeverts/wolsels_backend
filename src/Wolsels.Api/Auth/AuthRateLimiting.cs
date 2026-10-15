@@ -14,6 +14,7 @@ public static class AuthRateLimiting
     private static readonly string[] SensitivePaths =
     [
         "/api/auth/login", "/api/auth/register", "/api/auth/password", "/api/auth/manage/2fa", "/api/auth/manage/info",
+        "/api/household/invites", "/api/household/join",
     ];
 
     public static IServiceCollection AddAuthRateLimiting(this IServiceCollection services, AuthOptions options)

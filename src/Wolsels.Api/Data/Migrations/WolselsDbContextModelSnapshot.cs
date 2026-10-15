@@ -232,6 +232,9 @@ namespace Wolsels.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("HouseholdId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("LocationId")
                         .HasColumnType("INTEGER");
 
@@ -242,11 +245,6 @@ namespace Wolsels.Api.Data.Migrations
 
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("OwnerId")
-                        .IsRequired()
-                        .HasMaxLength(450)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Species")
@@ -260,9 +258,9 @@ namespace Wolsels.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("LocationId");
+                    b.HasIndex("HouseholdId");
 
-                    b.HasIndex("OwnerId");
+                    b.HasIndex("LocationId");
 
                     b.ToTable("Animals");
                 });
@@ -301,6 +299,9 @@ namespace Wolsels.Api.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("HouseholdId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<double>("InputWeightGrams")
                         .HasColumnType("REAL");
 
@@ -321,11 +322,6 @@ namespace Wolsels.Api.Data.Migrations
 
                     b.Property<double?>("OutputWeightGrams")
                         .HasColumnType("REAL");
-
-                    b.Property<string>("OwnerId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("TEXT");
 
                     b.Property<int?>("PlyCount")
                         .HasColumnType("INTEGER");
@@ -362,7 +358,7 @@ namespace Wolsels.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OwnerId");
+                    b.HasIndex("HouseholdId");
 
                     b.ToTable("Blends");
                 });
@@ -418,6 +414,9 @@ namespace Wolsels.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("HouseholdId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("LocationId")
                         .HasColumnType("INTEGER");
 
@@ -427,11 +426,6 @@ namespace Wolsels.Api.Data.Migrations
 
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("OwnerId")
-                        .IsRequired()
-                        .HasMaxLength(450)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("UpdatedAt")
@@ -450,9 +444,9 @@ namespace Wolsels.Api.Data.Migrations
 
                     b.HasIndex("Date");
 
-                    b.HasIndex("LocationId");
+                    b.HasIndex("HouseholdId");
 
-                    b.HasIndex("OwnerId");
+                    b.HasIndex("LocationId");
 
                     b.HasIndex("WoolId");
 
@@ -460,6 +454,94 @@ namespace Wolsels.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("CK_Harvest_AnimalOrLocation", "(\"AnimalId\" IS NOT NULL AND \"LocationId\" IS NULL) OR (\"AnimalId\" IS NULL AND \"LocationId\" IS NOT NULL)");
                         });
+                });
+
+            modelBuilder.Entity("Wolsels.Api.Domain.Household", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CreatedAt")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Households");
+                });
+
+            modelBuilder.Entity("Wolsels.Api.Domain.HouseholdInvite", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CreatedAt")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedByUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExpiresAt")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HouseholdId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UsedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UsedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HouseholdId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("HouseholdInvites");
+                });
+
+            modelBuilder.Entity("Wolsels.Api.Domain.HouseholdMember", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HouseholdId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("JoinedAt")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("UserId", "HouseholdId");
+
+                    b.HasIndex("HouseholdId");
+
+                    b.ToTable("HouseholdMembers");
                 });
 
             modelBuilder.Entity("Wolsels.Api.Domain.Location", b =>
@@ -472,6 +554,9 @@ namespace Wolsels.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("HouseholdId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -481,18 +566,13 @@ namespace Wolsels.Api.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("OwnerId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("UpdatedAt")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OwnerId");
+                    b.HasIndex("HouseholdId");
 
                     b.ToTable("Locations");
                 });
@@ -516,6 +596,9 @@ namespace Wolsels.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("HouseholdId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -527,11 +610,6 @@ namespace Wolsels.Api.Data.Migrations
 
                     b.Property<string>("Origin")
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("OwnerId")
-                        .IsRequired()
-                        .HasMaxLength(450)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("UpdatedAt")
@@ -548,7 +626,7 @@ namespace Wolsels.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OwnerId");
+                    b.HasIndex("HouseholdId");
 
                     b.ToTable("Wools");
                 });
@@ -653,6 +731,32 @@ namespace Wolsels.Api.Data.Migrations
                     b.Navigation("Location");
 
                     b.Navigation("Wool");
+                });
+
+            modelBuilder.Entity("Wolsels.Api.Domain.HouseholdInvite", b =>
+                {
+                    b.HasOne("Wolsels.Api.Domain.Household", null)
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Wolsels.Api.Domain.HouseholdMember", b =>
+                {
+                    b.HasOne("Wolsels.Api.Domain.Household", "Household")
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Household");
                 });
 
             modelBuilder.Entity("Wolsels.Api.Domain.Blend", b =>

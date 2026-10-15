@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
-using Wolsels.Api.Data;
+using Wolsels.Api.Households;
 using Wolsels.Api.Mail;
 
 namespace Wolsels.Api.Auth;
@@ -49,13 +49,14 @@ public static class AuthEndpoints
             var services = context.HttpContext.RequestServices;
             var users = services.GetRequiredService<UserManager<IdentityUser>>();
             var allow = services.GetRequiredService<IOptions<AuthOptions>>().Value.AllowRegistration;
-            if (!allow && await users.Users.AnyAsync())
+            // Met een geldige uitnodiging (?invite=...) kan registreren ook als het verder uit staat.
+            var invite = context.HttpContext.Request.Query["invite"].ToString();
+            if (!allow && await users.Users.AnyAsync()
+                && await services.GetRequiredService<HouseholdService>().FindValidInviteAsync(invite, context.HttpContext.RequestAborted) is null)
                 return Results.Problem(statusCode: StatusCodes.Status403Forbidden,
-                    title: "Registreren is uitgeschakeld. Vraag de beheerder om een account.");
+                    title: "Registreren is uitgeschakeld. Vraag een lid om een uitnodiging.");
 
-            var result = await next(context);
-            await ClaimUnownedDataAsync(services);
-            return result;
+            return await next(context);
         });
 
         auth.MapGet("/options", (IOptions<AuthOptions> options, UserManager<IdentityUser> users, IMailSender mail,
@@ -188,22 +189,5 @@ public static class AuthEndpoints
             cache.Set(key, sent, TimeSpan.FromHours(1));
             return true;
         }
-    }
-
-    /// <summary>
-    /// Gegevens van vóór de invoering van accounts hebben geen eigenaar; die gaan naar het eerste account.
-    /// </summary>
-    private static async Task ClaimUnownedDataAsync(IServiceProvider services)
-    {
-        var users = services.GetRequiredService<UserManager<IdentityUser>>();
-        if (await users.Users.CountAsync() != 1) return;
-        var ownerId = (await users.Users.SingleAsync()).Id;
-
-        var db = services.GetRequiredService<WolselsDbContext>();
-        await db.Wools.IgnoreQueryFilters().Where(e => e.OwnerId == "").ExecuteUpdateAsync(s => s.SetProperty(e => e.OwnerId, ownerId));
-        await db.Blends.IgnoreQueryFilters().Where(e => e.OwnerId == "").ExecuteUpdateAsync(s => s.SetProperty(e => e.OwnerId, ownerId));
-        await db.Locations.IgnoreQueryFilters().Where(e => e.OwnerId == "").ExecuteUpdateAsync(s => s.SetProperty(e => e.OwnerId, ownerId));
-        await db.Animals.IgnoreQueryFilters().Where(e => e.OwnerId == "").ExecuteUpdateAsync(s => s.SetProperty(e => e.OwnerId, ownerId));
-        await db.Harvests.IgnoreQueryFilters().Where(e => e.OwnerId == "").ExecuteUpdateAsync(s => s.SetProperty(e => e.OwnerId, ownerId));
     }
 }

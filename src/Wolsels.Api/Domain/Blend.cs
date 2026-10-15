@@ -15,10 +15,10 @@ public enum BlendStatus
 }
 
 /// <summary>Een mengsel van meerdere soorten wol in een vaste verhouding.</summary>
-public class Blend : IOwned
+public class Blend : IHouseholdData
 {
     public int Id { get; set; }
-    public string OwnerId { get; set; } = "";
+    public int HouseholdId { get; set; }
     public required string Name { get; set; }
     public BlendStatus Status { get; set; }
     /// <summary>Of de gewichten van de componenten van de wolvoorraad zijn afgeboekt.</summary>
