@@ -4,6 +4,9 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Wolsels.Api.Mail;
 
 namespace Wolsels.Api.Tests;
 
@@ -13,13 +16,25 @@ public class WolselsFactory : WebApplicationFactory<Program>
 
     protected virtual bool AllowRegistration => true;
 
+    /// <summary>Opgevangen e-mails in plaats van een echte mailserver.</summary>
+    public FakeMailSender Mail { get; } = new();
+
+    protected virtual void Configure(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+    {
+        builder.UseSetting("Auth:RateLimitPerMinute", "10000");
+        builder.UseSetting("Auth:RateLimitPerHour", "10000");
+        builder.UseSetting("Auth:PasswordResetPerIpPerHour", "10000");
+    }
+
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:Wolsels", $"Data Source={Path.Combine(_dir, "wolsels.db")};Pooling=False");
         builder.UseSetting("DataProtection:KeysPath", Path.Combine(_dir, "keys"));
         builder.UseSetting("Blends:MaxComponents", "3");
-        builder.UseSetting("Auth:RateLimitPerMinute", "1000");
         builder.UseSetting("Auth:AllowRegistration", AllowRegistration.ToString());
+        builder.UseSetting("App:PublicUrl", "https://wol.example.nl");
+        Configure(builder);
+        builder.ConfigureTestServices(services => services.AddSingleton<IMailSender>(Mail));
     }
 
     /// <summary>Registreert een nieuwe gebruiker en geeft een ingelogde client terug.</summary>
@@ -79,5 +94,18 @@ public static class Totp
             bits -= 8;
         }
         return output.ToArray();
+    }
+}
+
+public sealed class FakeMailSender : IMailSender
+{
+    public List<(string To, string Subject, string Text)> Sent { get; } = [];
+
+    public bool IsConfigured => true;
+
+    public Task SendAsync(string to, string subject, string text, string html, CancellationToken ct = default)
+    {
+        lock (Sent) Sent.Add((to, subject, text));
+        return Task.CompletedTask;
     }
 }

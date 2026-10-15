@@ -1,21 +1,29 @@
+using System.Net;
+using System.Text;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Wolsels.Api.Data;
+using Wolsels.Api.Mail;
 
 namespace Wolsels.Api.Auth;
 
 public static class AuthEndpoints
 {
-    public const string RateLimitPolicy = "auth";
-
     /// <summary>
-    /// Endpoints van ASP.NET Core Identity die zonder e-mailserver geen zin hebben of niet gebruikt worden.
+    /// Endpoints van ASP.NET Core Identity die niet gebruikt worden. Wachtwoord vergeten heeft eigen endpoints
+    /// hieronder, omdat die van Identity alleen werken voor bevestigde e-mailadressen.
     /// </summary>
     private static readonly string[] DisabledPaths =
         ["/confirmEmail", "/resendConfirmationEmail", "/forgotPassword", "/resetPassword", "/refresh"];
 
-    public sealed record AuthOptionsDto(bool AllowRegistration);
+    public sealed record AuthOptionsDto(bool AllowRegistration, bool PasswordResetAvailable);
+
+    public sealed record ForgotPasswordRequest(string Email);
+
+    public sealed record ResetPasswordRequest(string Email, string Code, string NewPassword);
 
     public sealed record ChangePasswordRequest(string OldPassword, string NewPassword);
 
@@ -29,7 +37,6 @@ public static class AuthEndpoints
         // Login: POST /api/auth/login?useCookies=true met { email, password, twoFactorCode?, twoFactorRecoveryCode? }.
         var identity = auth.MapGroup("");
         identity.MapIdentityApi<IdentityUser>();
-        identity.RequireRateLimiting(RateLimitPolicy);
         identity.AddEndpointFilter(async (context, next) =>
         {
             var path = context.HttpContext.Request.Path.Value ?? "";
@@ -51,8 +58,71 @@ public static class AuthEndpoints
             return result;
         });
 
-        auth.MapGet("/options", (IOptions<AuthOptions> options, UserManager<IdentityUser> users) =>
-                new AuthOptionsDto(options.Value.AllowRegistration || !users.Users.Any()))
+        auth.MapGet("/options", (IOptions<AuthOptions> options, UserManager<IdentityUser> users, IMailSender mail) =>
+                new AuthOptionsDto(options.Value.AllowRegistration || !users.Users.Any(), mail.IsConfigured))
+            .AllowAnonymous();
+
+        // Wachtwoord vergeten: stuurt een herstellink. Antwoordt altijd hetzelfde, zodat niet te achterhalen
+        // is welke e-mailadressen een account hebben.
+        auth.MapPost("/password/forgot", async (ForgotPasswordRequest request, HttpContext http,
+                UserManager<IdentityUser> users, IMailSender mail, IOptions<AppOptions> app, IOptions<AuthOptions> authOptions,
+                IMemoryCache cache, TimeProvider clock, ILoggerFactory loggers) =>
+            {
+                if (!mail.IsConfigured) return Results.NotFound();
+                if (await users.FindByEmailAsync(request.Email.Trim()) is { Email: { } email } user
+                    && TryCountMail(cache, clock, email, authOptions.Value.PasswordResetPerEmailPerHour))
+                {
+                    var token = await users.GeneratePasswordResetTokenAsync(user);
+                    var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+                    var baseUrl = app.Value.PublicUrl?.TrimEnd('/') ?? $"{http.Request.Scheme}://{http.Request.Host}";
+                    var link = $"{baseUrl}/wachtwoord-herstellen?email={Uri.EscapeDataString(email)}&code={code}";
+                    try
+                    {
+                        await mail.SendAsync(email, "Wachtwoord herstellen voor Wolsels",
+                            $"Hallo,\n\nJe hebt gevraagd om je wachtwoord voor Wolsels te herstellen. Open deze link om een nieuw wachtwoord in te stellen:\n\n{link}\n\nDe link is één dag geldig. Heb je dit niet zelf gevraagd? Dan kun je deze mail negeren.",
+                            $"<p>Hallo,</p><p>Je hebt gevraagd om je wachtwoord voor Wolsels te herstellen.</p><p><a href=\"{WebUtility.HtmlEncode(link)}\">Stel een nieuw wachtwoord in</a></p><p>De link is één dag geldig. Heb je dit niet zelf gevraagd? Dan kun je deze mail negeren.</p>",
+                            http.RequestAborted);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        loggers.CreateLogger("Wolsels.Auth").LogError(ex, "Versturen van de herstelmail is mislukt");
+                        return Results.Problem(statusCode: StatusCodes.Status502BadGateway,
+                            title: "De e-mail kon niet verstuurd worden. Probeer het later opnieuw.");
+                    }
+                }
+                return Results.NoContent();
+            })
+            .AllowAnonymous()
+            .RequireRateLimiting(AuthRateLimiting.PasswordResetPolicy);
+
+        auth.MapPost("/password/reset", async (ResetPasswordRequest request, UserManager<IdentityUser> users) =>
+            {
+                var invalid = Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["code"] = ["Deze herstellink is ongeldig of verlopen. Vraag een nieuwe aan."],
+                });
+                if (await users.FindByEmailAsync(request.Email.Trim()) is not { } user) return invalid;
+
+                string token;
+                try
+                {
+                    token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Code));
+                }
+                catch (FormatException)
+                {
+                    return invalid;
+                }
+
+                var result = await users.ResetPasswordAsync(user, token, request.NewPassword);
+                if (result.Succeeded)
+                {
+                    await users.ResetAccessFailedCountAsync(user);
+                    await users.SetLockoutEndDateAsync(user, null);
+                    return Results.NoContent();
+                }
+                if (result.Errors.Any(e => e.Code == nameof(IdentityErrorDescriber.InvalidToken))) return invalid;
+                return Results.ValidationProblem(result.Errors.ToDictionary(e => e.Code, e => new[] { e.Description }));
+            })
             .AllowAnonymous();
 
         auth.MapGet("/me", async (HttpContext http, UserManager<IdentityUser> users) =>
@@ -76,8 +146,7 @@ public static class AuthEndpoints
                 await signIn.RefreshSignInAsync(user);
                 return Results.NoContent();
             })
-            .RequireAuthorization()
-            .RequireRateLimiting(RateLimitPolicy);
+            .RequireAuthorization();
 
         // Na het wijzigen van 2FA-instellingen de sessiecookie vernieuwen, anders volgt later een onverwachte uitlog.
         auth.MapPost("/renew", async (HttpContext http, UserManager<IdentityUser> users, SignInManager<IdentityUser> signIn) =>
@@ -94,6 +163,24 @@ public static class AuthEndpoints
                 return Results.NoContent();
             })
             .RequireAuthorization();
+    }
+
+    /// <summary>
+    /// Telt herstelmails per e-mailadres in een venster van een uur. Boven de limiet wordt stil niets verstuurd,
+    /// zodat iemands mailbox niet bestookt kan worden en het antwoord niets verraadt.
+    /// </summary>
+    private static bool TryCountMail(IMemoryCache cache, TimeProvider clock, string email, int limit)
+    {
+        var key = $"password-reset:{email.ToUpperInvariant()}";
+        var now = clock.GetUtcNow();
+        lock (cache)
+        {
+            var sent = (cache.Get<List<DateTimeOffset>>(key) ?? []).Where(t => t > now.AddHours(-1)).ToList();
+            if (sent.Count >= limit) return false;
+            sent.Add(now);
+            cache.Set(key, sent, TimeSpan.FromHours(1));
+            return true;
+        }
     }
 
     /// <summary>

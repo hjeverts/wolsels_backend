@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
@@ -7,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Wolsels.Api.Auth;
 using Wolsels.Api.Data;
+using Wolsels.Api.Mail;
 using Wolsels.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +24,7 @@ builder.Services.AddDbContext<WolselsDbContext>(o =>
 
 // --- Authenticatie ---
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
+var authOptions = builder.Configuration.GetSection(AuthOptions.SectionName).Get<AuthOptions>() ?? new AuthOptions();
 builder.Services.AddAuthorization();
 builder.Services
     .AddIdentityApiEndpoints<IdentityUser>(o =>
@@ -35,8 +36,8 @@ builder.Services
         o.Password.RequireLowercase = false;
         o.Password.RequireUppercase = false;
         o.Password.RequireNonAlphanumeric = false;
-        o.Lockout.MaxFailedAccessAttempts = 5;
-        o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+        o.Lockout.MaxFailedAccessAttempts = authOptions.MaxFailedAccessAttempts;
+        o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(authOptions.LockoutMinutes);
         o.Lockout.AllowedForNewUsers = true;
     })
     .AddErrorDescriber<DutchIdentityErrorDescriber>()
@@ -55,26 +56,22 @@ builder.Services.AddDataProtection()
     .SetApplicationName("Wolsels")
     .PersistKeysToFileSystem(new DirectoryInfo(builder.Configuration["DataProtection:KeysPath"] ?? "data/keys"));
 
-// Achter nginx: client-IP en https van de proxy overnemen (de backend is alleen intern bereikbaar).
+// Achter nginx: client-IP en https van de proxy overnemen. De backend is alleen bereikbaar via de
+// frontend-container, die het echte client-IP bepaalt en als enige X-Forwarded-For-waarde doorgeeft.
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    o.ForwardLimit = builder.Configuration.GetValue("ForwardedHeaders:ForwardLimit", 2);
+    o.ForwardLimit = 1;
     o.KnownIPNetworks.Clear();
     o.KnownProxies.Clear();
 });
 
-builder.Services.AddRateLimiter(o =>
-{
-    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    o.AddPolicy(AuthEndpoints.RateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
-        http.Connection.RemoteIpAddress?.ToString() ?? "onbekend",
-        _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = builder.Configuration.GetValue("Auth:RateLimitPerMinute", 20),
-            Window = TimeSpan.FromMinutes(1),
-        }));
-});
+builder.Services.AddAuthRateLimiting(authOptions);
+builder.Services.AddMemoryCache();
+
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
+builder.Services.Configure<AppOptions>(builder.Configuration.GetSection(AppOptions.SectionName));
+builder.Services.AddSingleton<IMailSender, SmtpMailSender>();
 
 builder.Services.Configure<BlendOptions>(builder.Configuration.GetSection(BlendOptions.SectionName));
 builder.Services.AddSingleton(sp => new BlendCalculator(sp.GetRequiredService<IOptions<BlendOptions>>().Value.MaxComponents));
