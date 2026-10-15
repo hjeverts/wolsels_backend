@@ -30,15 +30,20 @@ dotnet ef migrations add <Naam> -p src/Wolsels.Api -o Data/Migrations
 | `ConnectionStrings__Wolsels`   | `Data Source=data/wolsels.db` | SQLite-database (in Docker `/data/...`)    |
 | `Blends__MaxComponents`        | `6`                           | Maximaal aantal soorten wol in een mengsel |
 | `Auth__AllowRegistration`      | `true`                        | Zelf registreren toestaan (het eerste account mag altijd) |
-| `Auth__RateLimitPerMinute`     | `20`                          | Max. auth-verzoeken per IP per minuut      |
+| `Auth__RateLimitPerMinute`     | `10`                          | Max. auth-verzoeken per IP per minuut      |
 | `DataProtection__KeysPath`     | `data/keys`                   | Sleutels voor sessiecookies (bewaren!)     |
-| `ForwardedHeaders__ForwardLimit` | `2`                         | Aantal proxies (host-nginx + container-nginx) |
+| `App__PublicUrl`               | –                             | Openbare URL, voor links in e-mails        |
+| `Smtp__Host` / `Port` / `Security` / `Username` / `Password` / `From` / `FromName` | – | Mailserver voor wachtwoordherstel |
+| `Auth__RateLimitPerHour`       | `60`                          | Max. auth-verzoeken per IP per uur         |
+| `Auth__PasswordResetPerIpPerHour` / `PerEmailPerHour` | `5` / `3` | Limieten herstelmails          |
+| `Auth__MaxFailedAccessAttempts` / `LockoutMinutes` | `5` / `15` | Accountblokkering                   |
 
 ## Accounts en 2FA
 
 Gebaseerd op ASP.NET Core Identity met een sessiecookie (`wolsels.auth`, HttpOnly, SameSite=Strict).
 Elke gebruiker ziet alleen zijn eigen gegevens (EF Core query filters op `OwnerId`). Wachtwoorden
-minimaal 10 tekens; na 5 foute pogingen (wachtwoord of 2FA-code) is een account 5 minuten geblokkeerd.
+minimaal 10 tekens; na 5 foute pogingen (wachtwoord of 2FA-code) is een account 15 minuten geblokkeerd.
+Daarnaast geldt een limiet per IP-adres per minuut en per uur op alle gevoelige auth-endpoints.
 Gegevens van vóór de invoering van accounts gaan naar het eerste geregistreerde account.
 
 | Endpoint                                 | Omschrijving                                                     |
@@ -49,10 +54,13 @@ Gegevens van vóór de invoering van accounts gaan naar het eerste geregistreerd
 | `GET /api/auth/me`                       | E-mail, 2FA-status, resterende herstelcodes                      |
 | `GET /api/auth/options`                  | Of registreren mogelijk is                                       |
 | `POST /api/auth/manage/2fa`              | 2FA (TOTP): sleutel ophalen, inschakelen, uitschakelen, herstelcodes resetten |
+| `POST /api/auth/password/forgot`         | Herstelmail (alleen met mailserver én `App__PublicUrl`) |
+| `POST /api/auth/password/reset`          | Nieuw wachtwoord met code uit de mail                 |
 | `POST /api/auth/password`                | Wachtwoord wijzigen (`oldPassword`, `newPassword`), sessie blijft geldig |
 | `POST /api/auth/renew`                   | Sessiecookie vernieuwen na het wijzigen van 2FA-instellingen     |
 
-Wachtwoord vergeten via e-mail is (nog) niet beschikbaar: er is geen mailserver geconfigureerd.
+"Wachtwoord vergeten" werkt zodra `Smtp__Host`, `Smtp__From` en `App__PublicUrl` zijn ingesteld. De link in de
+mail gebruikt altijd `App__PublicUrl`, nooit de Host-header van het verzoek.
 
 ## API
 

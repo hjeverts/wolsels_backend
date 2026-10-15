@@ -58,8 +58,9 @@ public static class AuthEndpoints
             return result;
         });
 
-        auth.MapGet("/options", (IOptions<AuthOptions> options, UserManager<IdentityUser> users, IMailSender mail) =>
-                new AuthOptionsDto(options.Value.AllowRegistration || !users.Users.Any(), mail.IsConfigured))
+        auth.MapGet("/options", (IOptions<AuthOptions> options, UserManager<IdentityUser> users, IMailSender mail,
+                IOptions<AppOptions> app) =>
+                new AuthOptionsDto(options.Value.AllowRegistration || !users.Users.Any(), PasswordResetAvailable(mail, app.Value)))
             .AllowAnonymous();
 
         // Wachtwoord vergeten: stuurt een herstellink. Antwoordt altijd hetzelfde, zodat niet te achterhalen
@@ -68,13 +69,14 @@ public static class AuthEndpoints
                 UserManager<IdentityUser> users, IMailSender mail, IOptions<AppOptions> app, IOptions<AuthOptions> authOptions,
                 IMemoryCache cache, TimeProvider clock, ILoggerFactory loggers) =>
             {
-                if (!mail.IsConfigured) return Results.NotFound();
+                if (!PasswordResetAvailable(mail, app.Value)) return Results.NotFound();
                 if (await users.FindByEmailAsync(request.Email.Trim()) is { Email: { } email } user
                     && TryCountMail(cache, clock, email, authOptions.Value.PasswordResetPerEmailPerHour))
                 {
                     var token = await users.GeneratePasswordResetTokenAsync(user);
                     var code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
-                    var baseUrl = app.Value.PublicUrl?.TrimEnd('/') ?? $"{http.Request.Scheme}://{http.Request.Host}";
+                    // Nooit de Host-header van het verzoek gebruiken: die kan vervalst zijn (password reset poisoning).
+                    var baseUrl = app.Value.PublicUrl!.TrimEnd('/');
                     var link = $"{baseUrl}/wachtwoord-herstellen?email={Uri.EscapeDataString(email)}&code={code}";
                     try
                     {
@@ -164,6 +166,11 @@ public static class AuthEndpoints
             })
             .RequireAuthorization();
     }
+
+    /// <summary>Herstelmails vereisen een mailserver én een vaste openbare URL voor de link.</summary>
+    private static bool PasswordResetAvailable(IMailSender mail, AppOptions app) =>
+        mail.IsConfigured && Uri.TryCreate(app.PublicUrl, UriKind.Absolute, out var url)
+            && (url.Scheme == Uri.UriSchemeHttps || url.Scheme == Uri.UriSchemeHttp);
 
     /// <summary>
     /// Telt herstelmails per e-mailadres in een venster van een uur. Boven de limiet wordt stil niets verstuurd,

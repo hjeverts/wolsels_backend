@@ -70,6 +70,34 @@ public class PasswordResetTests(WolselsFactory factory) : IClassFixture<WolselsF
     }
 }
 
+public sealed class NoPublicUrlFactory : WolselsFactory
+{
+    protected override void Configure(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+    {
+        base.Configure(builder);
+        builder.UseSetting("App:PublicUrl", "");
+    }
+}
+
+public class PasswordResetWithoutPublicUrlTests(NoPublicUrlFactory factory) : IClassFixture<NoPublicUrlFactory>
+{
+    [Fact]
+    public async Task ResetLinks_AreNeverBuiltFromTheHostHeader()
+    {
+        var email = $"{Guid.NewGuid():N}@example.nl";
+        await factory.CreateUserClientAsync(email);
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Host = "aanvaller.example";
+
+        var response = await client.PostAsJsonAsync("/api/auth/password/forgot", new { email });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Empty(factory.Mail.Sent);
+        var options = await client.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/auth/options");
+        Assert.False(options.GetProperty("passwordResetAvailable").GetBoolean());
+    }
+}
+
 /// <summary>Draait met lage limieten, zodat de begrenzing zelf getest kan worden.</summary>
 public sealed class StrictLimitsFactory : WolselsFactory
 {

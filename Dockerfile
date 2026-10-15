@@ -14,4 +14,7 @@ RUN mkdir -p /data && chown $APP_UID /data
 VOLUME /data
 USER $APP_UID
 EXPOSE 8080
+# Het aspnet-image heeft geen curl/wget; bash kan zelf een HTTP-request doen.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q Healthy <&3"]
 ENTRYPOINT ["dotnet", "Wolsels.Api.dll"]
