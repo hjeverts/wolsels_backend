@@ -49,7 +49,8 @@ Gegevens van vóór de invoering van accounts gaan naar het eerste geregistreerd
 | `GET /api/auth/me`                       | E-mail, 2FA-status, resterende herstelcodes                      |
 | `GET /api/auth/options`                  | Of registreren mogelijk is                                       |
 | `POST /api/auth/manage/2fa`              | 2FA (TOTP): sleutel ophalen, inschakelen, uitschakelen, herstelcodes resetten |
-| `POST /api/auth/manage/info`             | Wachtwoord wijzigen (`oldPassword`, `newPassword`)               |
+| `POST /api/auth/password`                | Wachtwoord wijzigen (`oldPassword`, `newPassword`), sessie blijft geldig |
+| `POST /api/auth/renew`                   | Sessiecookie vernieuwen na het wijzigen van 2FA-instellingen     |
 
 Wachtwoord vergeten via e-mail is (nog) niet beschikbaar: er is geen mailserver geconfigureerd.
 

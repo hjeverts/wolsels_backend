@@ -69,6 +69,29 @@ public class AuthTests(WolselsFactory factory) : IClassFixture<WolselsFactory>
     }
 
     [Fact]
+    public async Task ChangePassword_KeepsSessionAndRequiresNewPassword()
+    {
+        var email = $"{Guid.NewGuid():N}@example.nl";
+        var client = await factory.CreateUserClientAsync(email);
+
+        var wrong = await client.PostAsJsonAsync("/api/auth/password",
+            new { oldPassword = "niet het wachtwoord", newPassword = "een heel nieuw wachtwoord" });
+        Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+
+        var changed = await client.PostAsJsonAsync("/api/auth/password",
+            new { oldPassword = TestJson.Password, newPassword = "een heel nieuw wachtwoord" });
+        Assert.Equal(HttpStatusCode.NoContent, changed.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/auth/me")).StatusCode);
+
+        var oldLogin = await factory.CreateClient().PostAsJsonAsync("/api/auth/login?useCookies=true",
+            new { email, password = TestJson.Password });
+        Assert.Equal(HttpStatusCode.Unauthorized, oldLogin.StatusCode);
+        var newLogin = await factory.CreateClient().PostAsJsonAsync("/api/auth/login?useCookies=true",
+            new { email, password = "een heel nieuw wachtwoord" });
+        Assert.Equal(HttpStatusCode.OK, newLogin.StatusCode);
+    }
+
+    [Fact]
     public async Task ShortPassword_IsRejectedInDutch()
     {
         var response = await factory.CreateClient().PostAsJsonAsync("/api/auth/register",

@@ -17,6 +17,8 @@ public static class AuthEndpoints
 
     public sealed record AuthOptionsDto(bool AllowRegistration);
 
+    public sealed record ChangePasswordRequest(string OldPassword, string NewPassword);
+
     public sealed record MeDto(string Email, bool TwoFactorEnabled, int RecoveryCodesLeft);
 
     public static void MapAuthEndpoints(this WebApplication app)
@@ -60,6 +62,29 @@ public static class AuthEndpoints
                     user.Email ?? user.UserName ?? "",
                     await users.GetTwoFactorEnabledAsync(user),
                     await users.CountRecoveryCodesAsync(user)));
+            })
+            .RequireAuthorization();
+
+        // Wachtwoord wijzigen en direct een nieuwe sessiecookie uitgeven (de security stamp verandert).
+        auth.MapPost("/password", async (ChangePasswordRequest request, HttpContext http,
+                UserManager<IdentityUser> users, SignInManager<IdentityUser> signIn) =>
+            {
+                if (await users.GetUserAsync(http.User) is not { } user) return Results.Unauthorized();
+                var result = await users.ChangePasswordAsync(user, request.OldPassword, request.NewPassword);
+                if (!result.Succeeded)
+                    return Results.ValidationProblem(result.Errors.ToDictionary(e => e.Code, e => new[] { e.Description }));
+                await signIn.RefreshSignInAsync(user);
+                return Results.NoContent();
+            })
+            .RequireAuthorization()
+            .RequireRateLimiting(RateLimitPolicy);
+
+        // Na het wijzigen van 2FA-instellingen de sessiecookie vernieuwen, anders volgt later een onverwachte uitlog.
+        auth.MapPost("/renew", async (HttpContext http, UserManager<IdentityUser> users, SignInManager<IdentityUser> signIn) =>
+            {
+                if (await users.GetUserAsync(http.User) is not { } user) return Results.Unauthorized();
+                await signIn.RefreshSignInAsync(user);
+                return Results.NoContent();
             })
             .RequireAuthorization();
 
