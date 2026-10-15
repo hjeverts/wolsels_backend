@@ -15,11 +15,14 @@ public enum BlendStatus
 }
 
 /// <summary>Een mengsel van meerdere soorten wol in een vaste verhouding.</summary>
-public class Blend
+public class Blend : IOwned
 {
     public int Id { get; set; }
+    public string OwnerId { get; set; } = "";
     public required string Name { get; set; }
     public BlendStatus Status { get; set; }
+    /// <summary>Of de gewichten van de componenten van de wolvoorraad zijn afgeboekt.</summary>
+    public bool StockDeducted { get; set; }
     public CalculationBasis Basis { get; set; }
     /// <summary>Index (0-gebaseerd) van de component waarop is gerekend bij <see cref="CalculationBasis.ComponentWeight"/>.</summary>
     public int? BasisComponentIndex { get; set; }

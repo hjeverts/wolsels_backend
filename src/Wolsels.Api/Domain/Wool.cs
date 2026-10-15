@@ -1,9 +1,10 @@
 namespace Wolsels.Api.Domain;
 
 /// <summary>Een partij wol op voorraad.</summary>
-public class Wool
+public class Wool : IOwned
 {
     public int Id { get; set; }
+    public string OwnerId { get; set; } = "";
     public required string Name { get; set; }
     /// <summary>Wolsoort, bv. Merino, Shetland, Alpaca.</summary>
     public required string WoolType { get; set; }

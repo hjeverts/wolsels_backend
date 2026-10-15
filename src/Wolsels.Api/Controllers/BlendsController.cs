@@ -67,7 +67,10 @@ public class BlendsController(WolselsDbContext db, BlendCalculator calculator, T
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
-        if (await db.Blends.FindAsync([id], ct) is not { } blend) return NotFound();
+        if (await db.Blends.Include(b => b.Components).FirstOrDefaultAsync(b => b.Id == id, ct) is not { } blend)
+            return NotFound();
+        // Een verwijderd mengsel geeft de afgeboekte wol terug aan de voorraad.
+        await RestoreStockAsync(blend, ct);
         db.Blends.Remove(blend);
         await db.SaveChangesAsync(ct);
         return NoContent();
@@ -76,8 +79,8 @@ public class BlendsController(WolselsDbContext db, BlendCalculator calculator, T
     private async Task<ActionResult?> ApplyAsync(Blend blend, BlendRequest request, CancellationToken ct)
     {
         var woolIds = request.Components.Select(c => c.WoolId).Distinct().ToList();
-        var existing = await db.Wools.Where(w => woolIds.Contains(w.Id)).Select(w => w.Id).ToListAsync(ct);
-        if (existing.Count != woolIds.Count)
+        var wools = await db.Wools.Where(w => woolIds.Contains(w.Id)).ToDictionaryAsync(w => w.Id, ct);
+        if (wools.Count != woolIds.Count)
         {
             ModelState.AddModelError(nameof(request.Components), "Een of meer gekozen soorten wol bestaan niet meer.");
             return ValidationProblem(ModelState);
@@ -94,6 +97,28 @@ public class BlendsController(WolselsDbContext db, BlendCalculator calculator, T
         {
             return CalculationProblem(ex);
         }
+
+        // Eerst een eventuele eerdere afboeking terugdraaien, daarna opnieuw afboeken als het mengsel gesponnen is.
+        await RestoreStockAsync(blend, ct);
+        if (request.Status == BlendStatus.Spun)
+        {
+            var shortages = request.Components
+                .Select((c, i) => (c.WoolId, Weight: result.ComponentWeightsGrams[i]))
+                .GroupBy(x => x.WoolId)
+                .Select(g => (Wool: wools[g.Key], Needed: g.Sum(x => x.Weight)))
+                .Where(x => x.Needed > x.Wool.WeightGrams)
+                .Select(x => $"{x.Wool.Name}: {x.Needed:0.#} g nodig, {x.Wool.WeightGrams:0.#} g op voorraad")
+                .ToList();
+            if (shortages.Count > 0)
+            {
+                ModelState.AddModelError(nameof(request.Components),
+                    "Onvoldoende voorraad om af te boeken. " + string.Join("; ", shortages) + ".");
+                return ValidationProblem(ModelState);
+            }
+            for (var i = 0; i < request.Components.Count; i++)
+                wools[request.Components[i].WoolId].WeightGrams -= result.ComponentWeightsGrams[i];
+        }
+        blend.StockDeducted = request.Status == BlendStatus.Spun;
 
         blend.Name = request.Name.Trim();
         blend.Status = request.Status;
@@ -130,6 +155,19 @@ public class BlendsController(WolselsDbContext db, BlendCalculator calculator, T
             })
             .ToList();
         return null;
+    }
+
+    /// <summary>Boekt de eerder afgeboekte gewichten terug naar de voorraad (nog niet opgeslagen).</summary>
+    private async Task RestoreStockAsync(Blend blend, CancellationToken ct)
+    {
+        if (!blend.StockDeducted) return;
+        var woolIds = blend.Components.Select(c => c.WoolId).Distinct().ToList();
+        var wools = await db.Wools.Where(w => woolIds.Contains(w.Id)).ToDictionaryAsync(w => w.Id, ct);
+        foreach (var component in blend.Components)
+        {
+            if (wools.TryGetValue(component.WoolId, out var wool)) wool.WeightGrams += component.WeightGrams;
+        }
+        blend.StockDeducted = false;
     }
 
     private async Task<BlendDto> LoadDtoAsync(int id, CancellationToken ct) =>

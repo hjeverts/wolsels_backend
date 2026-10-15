@@ -1,38 +1,16 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Wolsels.Api.Contracts;
 using Wolsels.Api.Domain;
 
 namespace Wolsels.Api.Tests;
 
-public sealed class WolselsFactory : WebApplicationFactory<Program>
-{
-    private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"wolsels-test-{Guid.NewGuid():N}.db");
-
-    protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
-    {
-        builder.UseSetting("ConnectionStrings:Wolsels", $"Data Source={_dbPath};Pooling=False");
-        builder.UseSetting("Blends:MaxComponents", "3");
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        File.Delete(_dbPath);
-    }
-}
-
 public class ApiTests(WolselsFactory factory) : IClassFixture<WolselsFactory>
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter() },
-    };
+    private static readonly JsonSerializerOptions Json = TestJson.Options;
 
-    private readonly HttpClient _client = factory.CreateClient();
+    private readonly HttpClient _client = factory.CreateUserClientAsync().GetAwaiter().GetResult();
 
     private async Task<WoolDto> CreateWoolAsync(string name, decimal weight = 500)
     {

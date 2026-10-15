@@ -17,6 +17,7 @@ public sealed record BlendDto(
     int Id,
     string Name,
     BlendStatus Status,
+    bool StockDeducted,
     CalculationBasis Basis,
     int? BasisComponentIndex,
     decimal InputWeightGrams,
@@ -44,7 +45,7 @@ public sealed record BlendDto(
         var components = b.Components.OrderBy(c => c.Position).ToList();
         var ratioSum = components.Sum(c => c.Ratio);
         return new BlendDto(
-            b.Id, b.Name, b.Status, b.Basis, b.BasisComponentIndex, b.InputWeightGrams, b.Notes,
+            b.Id, b.Name, b.Status, b.StockDeducted, b.Basis, b.BasisComponentIndex, b.InputWeightGrams, b.Notes,
             components.Select(c => new BlendComponentDto(
                 c.WoolId,
                 c.Wool?.Name ?? "",
