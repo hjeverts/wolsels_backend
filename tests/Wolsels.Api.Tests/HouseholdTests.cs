@@ -130,9 +130,9 @@ public class HouseholdTests(WolselsFactory factory) : IClassFixture<WolselsFacto
         UseHousehold(member, joined.HouseholdId);
         Assert.Equal(HttpStatusCode.OK, (await member.PostAsync("/api/household/leave", null)).StatusCode);
 
-        // Het verlaten huishouden is niet meer toegankelijk; zonder header blijft het eigen huishouden over.
-        Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync("/api/households")).StatusCode);
-        member.DefaultRequestHeaders.Remove("X-Household");
+        // Het verlaten huishouden is niet meer toegankelijk; accountzaken en de lijst blijven werken.
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync("/api/wools")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await member.GetAsync("/api/auth/me")).StatusCode);
         var remaining = await member.GetFromJsonAsync<List<HouseholdSummaryDto>>("/api/households", Json);
         Assert.Single(remaining!);
     }

@@ -29,8 +29,16 @@ public class HouseholdMiddleware(RequestDelegate next)
                 return;
             }
 
+            // Accountzaken en de lijst met eigen huishoudens hangen niet af van het actieve huishouden.
+            var path = context.Request.Path;
+            if (path.StartsWithSegments("/api/auth"))
+            {
+                await next(context);
+                return;
+            }
+
             int? requested = null;
-            if (context.Request.Headers.TryGetValue(HeaderName, out var header))
+            if (!path.StartsWithSegments("/api/households") && context.Request.Headers.TryGetValue(HeaderName, out var header))
             {
                 if (!int.TryParse(header, out var id))
                 {
