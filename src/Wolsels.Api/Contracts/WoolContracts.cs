@@ -42,6 +42,11 @@ public sealed class WoolRequest
     }
 }
 
+public sealed class MergeWoolRequest
+{
+    [Range(1, int.MaxValue)] public int TargetWoolId { get; set; }
+}
+
 internal static class StringExtensions
 {
     public static string? NullIfEmpty(this string? value) =>

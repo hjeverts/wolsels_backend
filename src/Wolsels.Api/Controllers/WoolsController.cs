@@ -40,6 +40,36 @@ public class WoolsController(WolselsDbContext db, TimeProvider clock) : Controll
         return WoolDto.From(wool);
     }
 
+    /// <summary>
+    /// Voegt deze partij samen met een andere: het gewicht gaat over, en oogsten en mengsels die naar deze partij
+    /// verwijzen, verwijzen daarna naar de andere. Deze partij verdwijnt.
+    /// </summary>
+    [HttpPost("{id:int}/merge")]
+    public async Task<ActionResult<WoolDto>> Merge(int id, MergeWoolRequest request, CancellationToken ct)
+    {
+        if (id == request.TargetWoolId)
+        {
+            ModelState.AddModelError(nameof(request.TargetWoolId), "Kies een andere partij om mee samen te voegen.");
+            return ValidationProblem(ModelState);
+        }
+        if (await db.Wools.FindAsync([id], ct) is not { } source) return NotFound();
+        if (await db.Wools.FirstOrDefaultAsync(w => w.Id == request.TargetWoolId, ct) is not { } target)
+        {
+            ModelState.AddModelError(nameof(request.TargetWoolId), "Deze voorraadpartij bestaat niet.");
+            return ValidationProblem(ModelState);
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        target.WeightGrams += source.WeightGrams;
+        target.UpdatedAt = clock.GetUtcNow();
+        await db.SaveChangesAsync(ct);
+        await db.BlendComponents.Where(c => c.WoolId == id).ExecuteUpdateAsync(s => s.SetProperty(c => c.WoolId, target.Id), ct);
+        await db.Harvests.Where(h => h.WoolId == id).ExecuteUpdateAsync(s => s.SetProperty(h => h.WoolId, (int?)target.Id), ct);
+        await db.Wools.Where(w => w.Id == id).ExecuteDeleteAsync(ct);
+        await transaction.CommitAsync(ct);
+        return WoolDto.From(target);
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {

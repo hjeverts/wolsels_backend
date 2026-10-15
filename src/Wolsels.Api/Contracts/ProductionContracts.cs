@@ -74,11 +74,12 @@ public sealed record HarvestDto(
     string? Method,
     string? Grade,
     int? WoolId,
+    string? WoolName,
     string? Notes)
 {
     public static HarvestDto From(Harvest h) => new(
         h.Id, h.Date, h.AnimalId, h.Animal?.Name, h.LocationId, h.Location?.Name,
-        h.WeightGrams, h.Method, h.Grade, h.WoolId, h.Notes);
+        h.WeightGrams, h.Method, h.Grade, h.WoolId, h.Wool?.Name, h.Notes);
 }
 
 public sealed class HarvestRequest : IValidatableObject
@@ -90,8 +91,14 @@ public sealed class HarvestRequest : IValidatableObject
     [MaxLength(100)] public string? Method { get; set; }
     [MaxLength(100)] public string? Grade { get; set; }
     [MaxLength(4000)] public string? Notes { get; set; }
-    /// <summary>Maak bij het opslaan direct een wolvoorraad aan met deze oogst (alleen bij nieuwe oogsten).</summary>
+    /// <summary>
+    /// Voeg de oogst bij het opslaan toe aan de wolvoorraad, als dat nog niet gebeurd is: bij een bestaande partij
+    /// (<see cref="StockWoolId"/>) of als nieuwe partij.
+    /// </summary>
     public bool AddToStock { get; set; }
+
+    /// <summary>Bestaande partij waar de oogst bij wordt geteld; leeg = nieuwe partij.</summary>
+    public int? StockWoolId { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

@@ -11,13 +11,15 @@ namespace Wolsels.Api.Controllers;
 public class HarvestsController(WolselsDbContext db, TimeProvider clock) : ControllerBase
 {
     private IQueryable<Harvest> HarvestsWithSource =>
-        db.Harvests.Include(h => h.Animal).Include(h => h.Location);
+        db.Harvests.Include(h => h.Animal).Include(h => h.Location).Include(h => h.Wool);
 
     [HttpGet]
     public async Task<IEnumerable<HarvestDto>> List(
-        [FromQuery] int? animalId, [FromQuery] int? locationId, [FromQuery] int? year, CancellationToken ct)
+        [FromQuery] int? animalId, [FromQuery] int? locationId, [FromQuery] int? year, [FromQuery] int? woolId,
+        CancellationToken ct)
     {
         var query = HarvestsWithSource.AsNoTracking();
+        if (woolId is not null) query = query.Where(h => h.WoolId == woolId);
         if (animalId is not null) query = query.Where(h => h.AnimalId == animalId);
         if (locationId is not null) query = query.Where(h => h.LocationId == locationId);
         if (year is { } y)
@@ -40,7 +42,7 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
     [HttpGet("summary")]
     public async Task<ProductionSummaryDto> Summary([FromQuery] int? year, CancellationToken ct)
     {
-        var harvests = (await List(null, null, year, ct)).ToList();
+        var harvests = (await List(null, null, year, null, ct)).ToList();
         var perMonth = harvests
             .GroupBy(h => (h.Date.Year, h.Date.Month))
             .OrderBy(g => g.Key)
@@ -62,8 +64,8 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
         var harvest = new Harvest { CreatedAt = now, UpdatedAt = now };
         request.ApplyTo(harvest);
 
-        if (request.AddToStock)
-            harvest.Wool = await CreateStockAsync(request, now, ct);
+        if (request.AddToStock && await AddToStockAsync(harvest, request, now, ct) is { } stockProblem)
+            return stockProblem;
 
         db.Harvests.Add(harvest);
         await db.SaveChangesAsync(ct);
@@ -73,21 +75,66 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
     [HttpPut("{id:int}")]
     public async Task<ActionResult<HarvestDto>> Update(int id, HarvestRequest request, CancellationToken ct)
     {
-        if (await db.Harvests.FindAsync([id], ct) is not { } harvest) return NotFound();
+        if (await db.Harvests.Include(h => h.Wool).FirstOrDefaultAsync(h => h.Id == id, ct) is not { } harvest)
+            return NotFound();
         if (await ValidateSourceAsync(request, ct) is { } problem) return problem;
+
+        var previousWeight = harvest.WeightGrams;
         request.ApplyTo(harvest);
-        harvest.UpdatedAt = clock.GetUtcNow();
+        var now = clock.GetUtcNow();
+
+        if (harvest.Wool is { } wool)
+        {
+            // Al in de voorraad: een gewijzigd gewicht verrekenen met de partij.
+            wool.WeightGrams = Math.Max(0, wool.WeightGrams + harvest.WeightGrams - previousWeight);
+            wool.UpdatedAt = now;
+        }
+        else if (request.AddToStock && await AddToStockAsync(harvest, request, now, ct) is { } stockProblem)
+        {
+            return stockProblem;
+        }
+
+        harvest.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         return await LoadDtoAsync(id, ct);
     }
 
+    /// <param name="removeFromStock">Ook het gewicht van de oogst van de gekoppelde voorraadpartij afhalen.</param>
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id, CancellationToken ct)
+    public async Task<IActionResult> Delete(int id, [FromQuery] bool removeFromStock, CancellationToken ct)
     {
-        if (await db.Harvests.FindAsync([id], ct) is not { } harvest) return NotFound();
+        if (await db.Harvests.Include(h => h.Wool).FirstOrDefaultAsync(h => h.Id == id, ct) is not { } harvest)
+            return NotFound();
+        if (removeFromStock && harvest.Wool is { } wool)
+        {
+            wool.WeightGrams = Math.Max(0, wool.WeightGrams - harvest.WeightGrams);
+            wool.UpdatedAt = clock.GetUtcNow();
+        }
         db.Harvests.Remove(harvest);
         await db.SaveChangesAsync(ct);
         return NoContent();
+    }
+
+    /// <summary>Telt de oogst bij een bestaande partij op, of maakt een nieuwe partij.</summary>
+    private async Task<ActionResult?> AddToStockAsync(Harvest harvest, HarvestRequest request, DateTimeOffset now, CancellationToken ct)
+    {
+        if (request.StockWoolId is { } woolId)
+        {
+            // Query filter: alleen partijen van het eigen huishouden.
+            if (await db.Wools.FirstOrDefaultAsync(w => w.Id == woolId, ct) is not { } wool)
+            {
+                ModelState.AddModelError(nameof(request.StockWoolId), "Deze voorraadpartij bestaat niet.");
+                return ValidationProblem(ModelState);
+            }
+            wool.WeightGrams += harvest.WeightGrams;
+            wool.UpdatedAt = now;
+            harvest.Wool = wool;
+        }
+        else
+        {
+            harvest.Wool = await CreateStockAsync(request, now, ct);
+        }
+        return null;
     }
 
     private async Task<ActionResult?> ValidateSourceAsync(HarvestRequest request, CancellationToken ct)
