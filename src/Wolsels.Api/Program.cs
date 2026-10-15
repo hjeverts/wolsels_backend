@@ -56,8 +56,8 @@ builder.Services.AddDataProtection()
     .SetApplicationName("Wolsels")
     .PersistKeysToFileSystem(new DirectoryInfo(builder.Configuration["DataProtection:KeysPath"] ?? "data/keys"));
 
-// Achter nginx: client-IP en https van de proxy overnemen. De backend is alleen bereikbaar via de
-// frontend-container, die het echte client-IP bepaalt en als enige X-Forwarded-For-waarde doorgeeft.
+// Achter nginx: client-IP en https van de proxy overnemen. De backend luistert alleen op 127.0.0.1 van de
+// server; de nginx daar geeft het echte client-IP als enige X-Forwarded-For-waarde door.
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
