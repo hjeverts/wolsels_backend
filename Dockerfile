@@ -6,6 +6,8 @@ COPY src/ src/
 RUN dotnet publish src/Wolsels.Api/Wolsels.Api.csproj -c Release -o /app --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
+# Beveiligingsupdates van Ubuntu meenemen (opnieuw bouwen met ./scripts/update.sh --force).
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app .
 ENV ASPNETCORE_HTTP_PORTS=8080 \
