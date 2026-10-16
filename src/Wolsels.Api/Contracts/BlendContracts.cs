@@ -91,12 +91,12 @@ public sealed class BlendRequest
     [Range(1, 200)] public int? WrapsPerInch { get; set; }
     [Range(1, 20)] public int? PlyCount { get; set; }
     [MaxLength(100)] public string? PlyMethod { get; set; }
-    [RegularExpression("^[SZ]$", ErrorMessage = "Spinrichting is S of Z.")]
+    [RegularExpression("^[SZ]$", ErrorMessage = "Validation.SpinDirection")]
     public string? SpinDirection { get; set; }
 
     public bool IsDyed { get; set; }
     [MaxLength(100)] public string? DyeColor { get; set; }
-    [RegularExpression("^#[0-9a-fA-F]{6}$", ErrorMessage = "Gebruik een kleurcode als #a1b2c3.")]
+    [RegularExpression("^#[0-9a-fA-F]{6}$", ErrorMessage = "Validation.ColorHex")]
     public string? DyeColorHex { get; set; }
     [MaxLength(200)] public string? DyeProduct { get; set; }
     [MaxLength(4000)] public string? DyeMethod { get; set; }

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Wolsels.Api.Contracts;
 using Wolsels.Api.Data;
 using Wolsels.Api.Domain;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Controllers;
 
@@ -123,7 +124,7 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
             // Query filter: alleen partijen van het eigen huishouden.
             if (await db.Wools.FirstOrDefaultAsync(w => w.Id == woolId, ct) is not { } wool)
             {
-                ModelState.AddModelError(nameof(request.StockWoolId), "Deze voorraadpartij bestaat niet.");
+                ModelState.AddModelError(nameof(request.StockWoolId), Texts.Get("Wools.NotFound"));
                 return ValidationProblem(ModelState);
             }
             wool.WeightGrams += harvest.WeightGrams;
@@ -140,9 +141,9 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
     private async Task<ActionResult?> ValidateSourceAsync(HarvestRequest request, CancellationToken ct)
     {
         if (request.AnimalId is { } animalId && !await db.Animals.AnyAsync(a => a.Id == animalId, ct))
-            ModelState.AddModelError(nameof(request.AnimalId), "Dit dier bestaat niet.");
+            ModelState.AddModelError(nameof(request.AnimalId), Texts.Get("Harvests.AnimalNotFound"));
         if (request.LocationId is { } locationId && !await db.Locations.AnyAsync(l => l.Id == locationId, ct))
-            ModelState.AddModelError(nameof(request.LocationId), "Deze locatie bestaat niet.");
+            ModelState.AddModelError(nameof(request.LocationId), Texts.Get("Locations.NotFound"));
         return ModelState.IsValid ? null : ValidationProblem(ModelState);
     }
 
@@ -154,14 +155,14 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
             var animal = await db.Animals.FirstAsync(a => a.Id == animalId, ct);
             name = $"{animal.Name} {request.Date:yyyy-MM-dd}";
             woolType = animal.Breed ?? animal.Species;
-            color = animal.Color ?? "Naturel";
+            color = animal.Color ?? Texts.Get("Harvests.Natural");
         }
         else
         {
             var location = await db.Locations.FirstAsync(l => l.Id == request.LocationId, ct);
             name = $"{location.Name} {request.Date:yyyy-MM-dd}";
-            woolType = "Eigen productie";
-            color = "Naturel";
+            woolType = Texts.Get("Harvests.OwnProduction");
+            color = Texts.Get("Harvests.Natural");
         }
 
         var wool = new Wool
@@ -170,8 +171,8 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
             WoolType = woolType,
             Color = color,
             WeightGrams = request.WeightGrams,
-            Origin = "Eigen productie",
-            Notes = request.Grade is null ? "Ruwe wol" : $"Ruwe wol, {request.Grade}",
+            Origin = Texts.Get("Harvests.OwnProduction"),
+            Notes = request.Grade is null ? Texts.Get("Harvests.RawWool") : Texts.Get("Harvests.RawWoolGrade", request.Grade),
             CreatedAt = now,
             UpdatedAt = now,
         };

@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Auth;
 
@@ -29,7 +30,7 @@ public static class AuthRateLimiting
                 await context.HttpContext.Response.WriteAsJsonAsync(new
                 {
                     status = 429,
-                    title = "Te veel pogingen. Wacht even en probeer het opnieuw.",
+                    title = Texts.Get("Auth.TooManyAttempts"),
                 }, ct);
             };
 

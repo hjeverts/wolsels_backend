@@ -40,3 +40,11 @@ public interface IHouseholdData
 {
     int HouseholdId { get; set; }
 }
+
+/// <summary>Persoonlijke instellingen van een gebruiker (los van het huishouden).</summary>
+public class UserSettings
+{
+    public required string UserId { get; set; }
+    /// <summary>Taalcode van de app, zie <see cref="Localization.Texts.Languages"/>.</summary>
+    public required string Language { get; set; }
+}

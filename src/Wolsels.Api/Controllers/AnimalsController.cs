@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Wolsels.Api.Contracts;
 using Wolsels.Api.Data;
 using Wolsels.Api.Domain;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Controllers;
 
@@ -58,7 +59,7 @@ public class AnimalsController(WolselsDbContext db, TimeProvider clock) : Contro
         if (await db.Animals.FindAsync([id], ct) is not { } animal) return NotFound();
         if (await db.Harvests.AnyAsync(h => h.AnimalId == id, ct))
             return Problem(statusCode: StatusCodes.Status409Conflict,
-                title: "Dit dier heeft oogsten. Zet het op inactief om de historie te bewaren.");
+                title: Texts.Get("Animals.HasHarvests"));
         db.Animals.Remove(animal);
         await db.SaveChangesAsync(ct);
         return NoContent();
@@ -83,7 +84,7 @@ public class AnimalsController(WolselsDbContext db, TimeProvider clock) : Contro
         for (var i = 0; i < request.Rows.Count; i++)
         {
             var row = request.Rows[i];
-            var prefix = $"Regel {row.Line ?? i + 1}: ";
+            var prefix = Texts.Get("Import.LinePrefix", row.Line ?? i + 1);
             var name = row.Name.Trim();
             var matches = existing[name].ToList();
             if (matches.Count > 0 && !request.UpdateExisting)
@@ -93,12 +94,12 @@ public class AnimalsController(WolselsDbContext db, TimeProvider clock) : Contro
             }
             if (matches.Count > 1)
             {
-                ModelState.AddModelError(nameof(request.Rows), $"{prefix}er zijn meerdere dieren met de naam \"{name}\", dus het is niet duidelijk welke bijgewerkt moet worden.");
+                ModelState.AddModelError(nameof(request.Rows), prefix + Texts.Get("Import.DuplicateExisting", name));
                 continue;
             }
             if (matches.Count == 1 && timesInFile[name] > 1)
             {
-                ModelState.AddModelError(nameof(request.Rows), $"{prefix}\"{name}\" staat meerdere keren in het bestand.");
+                ModelState.AddModelError(nameof(request.Rows), prefix + Texts.Get("Import.DuplicateInFile", name));
                 continue;
             }
 
@@ -108,7 +109,7 @@ public class AnimalsController(WolselsDbContext db, TimeProvider clock) : Contro
             {
                 if ((row.Species.NullIfEmpty() ?? request.DefaultSpecies.NullIfEmpty()) is not { } newSpecies)
                 {
-                    ModelState.AddModelError(nameof(request.Rows), $"{prefix}diersoort ontbreekt.");
+                    ModelState.AddModelError(nameof(request.Rows), prefix + Texts.Get("Import.SpeciesMissing"));
                     continue;
                 }
                 animal = new Animal { Name = name, Species = newSpecies, CreatedAt = now, Active = row.Active ?? true };
@@ -158,7 +159,7 @@ public class AnimalsController(WolselsDbContext db, TimeProvider clock) : Contro
     {
         if (request.LocationId is { } locationId && !await db.Locations.AnyAsync(l => l.Id == locationId, ct))
         {
-            ModelState.AddModelError(nameof(request.LocationId), "Deze locatie bestaat niet.");
+            ModelState.AddModelError(nameof(request.LocationId), Texts.Get("Locations.NotFound"));
             return ValidationProblem(ModelState);
         }
         return null;

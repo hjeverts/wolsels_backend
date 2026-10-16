@@ -6,6 +6,7 @@ using Wolsels.Api.Contracts;
 using Wolsels.Api.Data;
 using Wolsels.Api.Households;
 using Wolsels.Api.Services;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Controllers;
 
@@ -71,7 +72,7 @@ public class HouseholdController(
     public async Task<ActionResult<InviteInfoDto>> GetInvite(string token, CancellationToken ct) =>
         await households.FindValidInviteAsync(token, ct) is { } info
             ? new InviteInfoDto(info.Household.Name, info.InvitedBy, info.Invite.ExpiresAt)
-            : Problem(statusCode: StatusCodes.Status404NotFound, title: "Deze uitnodiging is ongeldig, verlopen of al gebruikt.");
+            : Problem(statusCode: StatusCodes.Status404NotFound, title: Texts.Get("Household.InviteInvalid"));
 
     /// <summary>Wordt lid van het huishouden van de uitnodiging (naast je andere huishoudens).</summary>
     [HttpPost("join")]

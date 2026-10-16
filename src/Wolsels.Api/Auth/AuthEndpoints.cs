@@ -5,8 +5,11 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using Wolsels.Api.Data;
+using Wolsels.Api.Domain;
 using Wolsels.Api.Households;
 using Wolsels.Api.Mail;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Auth;
 
@@ -27,7 +30,9 @@ public static class AuthEndpoints
 
     public sealed record ChangePasswordRequest(string OldPassword, string NewPassword);
 
-    public sealed record MeDto(string Email, bool TwoFactorEnabled, int RecoveryCodesLeft, bool IsAdmin);
+    public sealed record MeDto(string Email, bool TwoFactorEnabled, int RecoveryCodesLeft, bool IsAdmin, string? Language);
+
+    public sealed record LanguageRequest(string? Language);
 
     public static void MapAuthEndpoints(this WebApplication app)
     {
@@ -54,7 +59,7 @@ public static class AuthEndpoints
             if (!allow && await users.Users.AnyAsync()
                 && await services.GetRequiredService<HouseholdService>().FindValidInviteAsync(invite, context.HttpContext.RequestAborted) is null)
                 return Results.Problem(statusCode: StatusCodes.Status403Forbidden,
-                    title: "Registreren is uitgeschakeld. Vraag een lid om een uitnodiging.");
+                    title: Texts.Get("Registration.Disabled"));
 
             var result = await next(context);
             // Het allereerste account wordt beheerder van de site.
@@ -76,7 +81,7 @@ public static class AuthEndpoints
         // is welke e-mailadressen een account hebben.
         auth.MapPost("/password/forgot", async (ForgotPasswordRequest request, HttpContext http,
                 UserManager<IdentityUser> users, IMailSender mail, IOptions<AppOptions> app, IOptions<AuthOptions> authOptions,
-                IMemoryCache cache, TimeProvider clock, ILoggerFactory loggers) =>
+                IMemoryCache cache, TimeProvider clock, ILoggerFactory loggers, WolselsDbContext db) =>
             {
                 if (!PasswordResetAvailable(mail, app.Value)) return Results.NotFound();
                 if (await users.FindByEmailAsync(request.Email.Trim()) is { Email: { } email } user
@@ -84,18 +89,22 @@ public static class AuthEndpoints
                 {
                     // Nooit de Host-header van het verzoek gebruiken: die kan vervalst zijn (password reset poisoning).
                     var link = app.Value.PublicUrl!.TrimEnd('/') + await PasswordResetLinks.CreatePathAsync(users, user);
+                    // De mail in de taal uit het profiel; zonder profieltaal die van het verzoek.
+                    var language = (await db.UserSettings.FindAsync([user.Id], http.RequestAborted))?.Language ?? Texts.CurrentLanguage;
+                    string T(string key) => Texts.GetFor(language, key);
+                    string Html(string key) => WebUtility.HtmlEncode(T(key));
                     try
                     {
-                        await mail.SendAsync(email, "Wachtwoord herstellen voor Wolsels",
-                            $"Hallo,\n\nJe hebt gevraagd om je wachtwoord voor Wolsels te herstellen. Open deze link om een nieuw wachtwoord in te stellen:\n\n{link}\n\nDe link is één dag geldig. Heb je dit niet zelf gevraagd? Dan kun je deze mail negeren.",
-                            $"<p>Hallo,</p><p>Je hebt gevraagd om je wachtwoord voor Wolsels te herstellen.</p><p><a href=\"{WebUtility.HtmlEncode(link)}\">Stel een nieuw wachtwoord in</a></p><p>De link is één dag geldig. Heb je dit niet zelf gevraagd? Dan kun je deze mail negeren.</p>",
+                        await mail.SendAsync(email, T("PasswordReset.MailSubject"),
+                            $"{T("PasswordReset.MailGreeting")}\n\n{T("PasswordReset.MailIntro")} {T("PasswordReset.MailOpenLink")}\n\n{link}\n\n{T("PasswordReset.MailFooter")}",
+                            $"<p>{Html("PasswordReset.MailGreeting")}</p><p>{Html("PasswordReset.MailIntro")}</p><p><a href=\"{WebUtility.HtmlEncode(link)}\">{Html("PasswordReset.MailLinkText")}</a></p><p>{Html("PasswordReset.MailFooter")}</p>",
                             http.RequestAborted);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         loggers.CreateLogger("Wolsels.Auth").LogError(ex, "Versturen van de herstelmail is mislukt");
                         return Results.Problem(statusCode: StatusCodes.Status502BadGateway,
-                            title: "De e-mail kon niet verstuurd worden. Probeer het later opnieuw.");
+                            title: Texts.Get("PasswordReset.MailFailed"));
                     }
                 }
                 return Results.NoContent();
@@ -107,7 +116,7 @@ public static class AuthEndpoints
             {
                 var invalid = Results.ValidationProblem(new Dictionary<string, string[]>
                 {
-                    ["code"] = ["Deze herstellink is ongeldig of verlopen. Vraag een nieuwe aan."],
+                    ["code"] = [Texts.Get("PasswordReset.InvalidLink")],
                 });
                 if (await users.FindByEmailAsync(request.Email.Trim()) is not { } user) return invalid;
 
@@ -133,14 +142,34 @@ public static class AuthEndpoints
             })
             .AllowAnonymous();
 
-        auth.MapGet("/me", async (HttpContext http, UserManager<IdentityUser> users) =>
+        auth.MapGet("/me", async (HttpContext http, UserManager<IdentityUser> users, WolselsDbContext db) =>
             {
                 if (await users.GetUserAsync(http.User) is not { } user) return Results.Unauthorized();
                 return Results.Ok(new MeDto(
                     user.Email ?? user.UserName ?? "",
                     await users.GetTwoFactorEnabledAsync(user),
                     await users.CountRecoveryCodesAsync(user),
-                    await users.IsInRoleAsync(user, Admin.AdminAuthorization.Role)));
+                    await users.IsInRoleAsync(user, Admin.AdminAuthorization.Role),
+                    (await db.UserSettings.FindAsync([user.Id], http.RequestAborted))?.Language));
+            })
+            .RequireAuthorization();
+
+        // Taal van de app, opgeslagen in het profiel zodat die op elk apparaat geldt.
+        auth.MapPut("/language", async (LanguageRequest request, HttpContext http, UserManager<IdentityUser> users,
+                WolselsDbContext db) =>
+            {
+                if (await users.GetUserAsync(http.User) is not { } user) return Results.Unauthorized();
+                if (request.Language is not { } code || !Texts.Languages.Contains(code))
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["language"] = [Texts.Get("Language.Unsupported")],
+                    });
+                // Atomic upsert: two concurrent first saves (e.g. two tabs) must not both try to insert the row.
+                await db.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO "UserSettings" ("UserId", "Language") VALUES ({user.Id}, {code})
+                    ON CONFLICT ("UserId") DO UPDATE SET "Language" = excluded."Language"
+                    """, http.RequestAborted);
+                return Results.NoContent();
             })
             .RequireAuthorization();
 

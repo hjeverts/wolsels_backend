@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Wolsels.Api.Admin;
 using Wolsels.Api.Services;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Households;
 
@@ -26,7 +27,7 @@ public class HouseholdMiddleware(RequestDelegate next)
             {
                 await signIn.SignOutAsync();
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await context.Response.WriteAsJsonAsync(new { status = 401, title = "Je account is geblokkeerd of bestaat niet meer." });
+                await context.Response.WriteAsJsonAsync(new { status = 401, title = Texts.Get("Auth.AccountBlocked") });
                 return;
             }
 
@@ -86,7 +87,7 @@ public class HouseholdMiddleware(RequestDelegate next)
         {
             type = "household-access",
             status = 403,
-            title = "Je bent geen lid (meer) van dit huishouden.",
+            title = Texts.Get("Household.NotMember"),
         });
     }
 }

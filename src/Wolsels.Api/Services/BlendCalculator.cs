@@ -1,4 +1,5 @@
 using Wolsels.Api.Domain;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Services;
 
@@ -32,11 +33,11 @@ public class BlendCalculator(int maxComponents)
     {
         var ratios = input.Ratios;
         if (ratios.Count == 0)
-            throw new BlendCalculationException("components", "Een mengsel heeft minimaal één soort wol nodig.");
+            throw new BlendCalculationException("components", Texts.Get("Calc.NoComponents"));
         if (ratios.Count > maxComponents)
-            throw new BlendCalculationException("components", $"Een mengsel mag maximaal {maxComponents} soorten wol bevatten.");
+            throw new BlendCalculationException("components", Texts.Get("Calc.TooManyComponents", maxComponents));
         if (ratios.Any(r => r <= 0))
-            throw new BlendCalculationException("ratio", "Elke verhouding moet groter dan 0 zijn.");
+            throw new BlendCalculationException("ratio", Texts.Get("Calc.RatioPositive"));
 
         var ratioSum = ratios.Sum();
         var percentages = ratios.Select(r => Math.Round(r / ratioSum * 100m, 1, MidpointRounding.AwayFromZero)).ToList();
@@ -45,7 +46,7 @@ public class BlendCalculator(int maxComponents)
         {
             CalculationBasis.TotalWeight => FromTotal(ratios, ratioSum, percentages, input.TotalWeightGrams),
             CalculationBasis.ComponentWeight => FromComponent(ratios, percentages, input.BasisComponentIndex, input.BasisComponentWeightGrams),
-            _ => throw new BlendCalculationException("basis", "Onbekende rekenbasis."),
+            _ => throw new BlendCalculationException("basis", Texts.Get("Calc.UnknownBasis")),
         };
     }
 
@@ -53,7 +54,7 @@ public class BlendCalculator(int maxComponents)
         IReadOnlyList<decimal> ratios, decimal ratioSum, List<decimal> percentages, decimal? totalWeight)
     {
         if (totalWeight is not > 0)
-            throw new BlendCalculationException("totalWeightGrams", "Vul een totaalgewicht groter dan 0 in.");
+            throw new BlendCalculationException("totalWeightGrams", Texts.Get("Calc.TotalPositive"));
 
         // Grootste-restmethode: verdeel het totaal in tienden van een gram zodat de som exact klopt.
         var totalTenths = (long)Math.Round(totalWeight.Value * TenthsPerGram, MidpointRounding.AwayFromZero);
@@ -79,9 +80,9 @@ public class BlendCalculator(int maxComponents)
         IReadOnlyList<decimal> ratios, List<decimal> percentages, int? basisIndex, decimal? basisWeight)
     {
         if (basisIndex is not { } index || index < 0 || index >= ratios.Count)
-            throw new BlendCalculationException("basisComponentIndex", "Kies de soort wol waarvan het gewicht bekend is.");
+            throw new BlendCalculationException("basisComponentIndex", Texts.Get("Calc.ChooseBasis"));
         if (basisWeight is not > 0)
-            throw new BlendCalculationException("basisComponentWeightGrams", "Vul een gewicht groter dan 0 in.");
+            throw new BlendCalculationException("basisComponentWeightGrams", Texts.Get("Calc.WeightPositive"));
 
         var known = Math.Round(basisWeight.Value, 1, MidpointRounding.AwayFromZero);
         var weights = ratios

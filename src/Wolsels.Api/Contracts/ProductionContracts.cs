@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Wolsels.Api.Domain;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Contracts;
 
@@ -104,9 +105,9 @@ public sealed class HarvestRequest : IValidatableObject
     {
         if (AnimalId is null == LocationId is null)
             yield return new ValidationResult(
-                "Kies een dier óf een locatie.", [nameof(AnimalId), nameof(LocationId)]);
+                Texts.Get("Harvests.ChooseSource"), [nameof(AnimalId), nameof(LocationId)]);
         if (Date == default)
-            yield return new ValidationResult("Vul een datum in.", [nameof(Date)]);
+            yield return new ValidationResult(Texts.Get("Harvests.DateRequired"), [nameof(Date)]);
     }
 
     public void ApplyTo(Harvest h)

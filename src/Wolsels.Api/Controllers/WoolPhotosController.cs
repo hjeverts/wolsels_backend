@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Wolsels.Api.Data;
 using Wolsels.Api.Domain;
 using Wolsels.Api.Services;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Controllers;
 
@@ -22,7 +23,6 @@ public class WoolPhotosController(WolselsDbContext db, TimeProvider clock) : Con
     /// </summary>
     public static readonly SemaphoreSlim CountLock = new(1, 1);
 
-    public static readonly string TooManyPhotos = $"Een partij kan maximaal {MaxPhotosPerWool} foto's hebben.";
     /// <summary>Langste zijde van een foto; de frontend verkleint tot 1600 px, met wat ruimte.</summary>
     public const int MaxPhotoSide = 2048;
     public const int MaxThumbnailSide = 512;
@@ -36,8 +36,8 @@ public class WoolPhotosController(WolselsDbContext db, TimeProvider clock) : Con
     public async Task<ActionResult<int>> Upload(int woolId, IFormFile? photo, IFormFile? thumbnail, CancellationToken ct)
     {
         if (await db.Wools.FindAsync([woolId], ct) is null) return NotFound();
-        var data = await ReadJpegAsync(photo, nameof(photo), "De foto", MaxPhotoBytes, MaxPhotoSide, ct);
-        var thumb = await ReadJpegAsync(thumbnail, nameof(thumbnail), "De miniatuur", MaxThumbnailBytes, MaxThumbnailSide, ct);
+        var data = await ReadJpegAsync(photo, nameof(photo), Texts.Get("Photos.Photo"), MaxPhotoBytes, MaxPhotoSide, ct);
+        var thumb = await ReadJpegAsync(thumbnail, nameof(thumbnail), Texts.Get("Photos.Thumbnail"), MaxThumbnailBytes, MaxThumbnailSide, ct);
         if (data is null || thumb is null) return ValidationProblem(ModelState);
 
         var entity = new WoolPhoto { WoolId = woolId, Data = data, Thumbnail = thumb, CreatedAt = clock.GetUtcNow() };
@@ -45,7 +45,7 @@ public class WoolPhotosController(WolselsDbContext db, TimeProvider clock) : Con
         try
         {
             if (await db.WoolPhotos.CountAsync(p => p.WoolId == woolId, ct) >= MaxPhotosPerWool)
-                return Problem(statusCode: StatusCodes.Status409Conflict, title: TooManyPhotos);
+                return Problem(statusCode: StatusCodes.Status409Conflict, title: Texts.Get("Photos.TooMany", MaxPhotosPerWool));
             db.WoolPhotos.Add(entity);
             await db.SaveChangesAsync(ct);
         }
@@ -95,12 +95,12 @@ public class WoolPhotosController(WolselsDbContext db, TimeProvider clock) : Con
     {
         if (file is null || file.Length == 0)
         {
-            ModelState.AddModelError(key, $"{label} ontbreekt.");
+            ModelState.AddModelError(key, Texts.Get("Photos.Missing", label));
             return null;
         }
         if (file.Length > maxBytes)
         {
-            ModelState.AddModelError(key, $"{label} is groter dan {maxBytes / 1024} kB.");
+            ModelState.AddModelError(key, Texts.Get("Photos.TooLarge", label, maxBytes / 1024));
             return null;
         }
         using var stream = new MemoryStream((int)file.Length);
@@ -108,12 +108,12 @@ public class WoolPhotosController(WolselsDbContext db, TimeProvider clock) : Con
         var bytes = stream.ToArray();
         if (!JpegInfo.TryReadSize(bytes, out var width, out var height))
         {
-            ModelState.AddModelError(key, $"{label} is geen JPEG-afbeelding.");
+            ModelState.AddModelError(key, Texts.Get("Photos.NotJpeg", label));
             return null;
         }
         if (Math.Max(width, height) > maxSide)
         {
-            ModelState.AddModelError(key, $"{label} is {width}×{height} pixels; maximaal {maxSide} pixels aan de lange kant.");
+            ModelState.AddModelError(key, Texts.Get("Photos.TooManyPixels", label, width, height, maxSide));
             return null;
         }
         return bytes;

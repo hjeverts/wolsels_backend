@@ -8,13 +8,17 @@ using Wolsels.Api.Admin;
 using Wolsels.Api.Auth;
 using Wolsels.Api.Data;
 using Wolsels.Api.Households;
+using Wolsels.Api.Localization;
 using Wolsels.Api.Mail;
 using Wolsels.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddLocalization();
 builder.Services.AddControllers()
-    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    // ErrorMessage van validatieattributen is een sleutel in Localization/Texts.
+    .AddDataAnnotationsLocalization(o => o.DataAnnotationLocalizerProvider = (_, _) => new TextsStringLocalizer());
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks().AddDbContextCheck<WolselsDbContext>();
@@ -45,7 +49,7 @@ builder.Services
         o.Lockout.AllowedForNewUsers = true;
     })
     .AddRoles<IdentityRole>()
-    .AddErrorDescriber<DutchIdentityErrorDescriber>()
+    .AddErrorDescriber<LocalizedIdentityErrorDescriber>()
     .AddEntityFrameworkStores<WolselsDbContext>();
 builder.Services.ConfigureApplicationCookie(o =>
 {
@@ -95,6 +99,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseForwardedHeaders();
+app.UseMiddleware<RequestLanguageMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {

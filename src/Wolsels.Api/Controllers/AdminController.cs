@@ -8,6 +8,7 @@ using Wolsels.Api.Contracts;
 using Wolsels.Api.Data;
 using Wolsels.Api.Households;
 using Wolsels.Api.Services;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Controllers;
 
@@ -46,7 +47,7 @@ public class AdminController(
     [HttpPost("{id}/block")]
     public Task<IActionResult> Block(string id) => WithUser(id, async user =>
     {
-        if (user.Id == MyId) return Problem(statusCode: 400, title: "Je kunt jezelf niet blokkeren.");
+        if (user.Id == MyId) return Problem(statusCode: 400, title: Texts.Get("Admin.CannotBlockSelf"));
         await users.SetLockoutEnabledAsync(user, true);
         await users.SetLockoutEndDateAsync(user, AccountBlocking.BlockedUntil);
         await users.UpdateSecurityStampAsync(user);
@@ -84,7 +85,7 @@ public class AdminController(
         if (!request.IsAdmin && isAdmin)
         {
             if ((await users.GetUsersInRoleAsync(AdminAuthorization.Role)).Count <= 1)
-                return Problem(statusCode: 409, title: "Er moet minstens één beheerder overblijven.");
+                return Problem(statusCode: 409, title: Texts.Get("Admin.LastAdmin"));
             await users.RemoveFromRoleAsync(user, AdminAuthorization.Role);
         }
         return NoContent();
@@ -99,16 +100,16 @@ public class AdminController(
     [HttpDelete("{id}")]
     public Task<IActionResult> Delete(string id, CancellationToken ct) => WithUser(id, async user =>
     {
-        if (user.Id == MyId) return Problem(statusCode: 400, title: "Je kunt je eigen account hier niet verwijderen.");
+        if (user.Id == MyId) return Problem(statusCode: 400, title: Texts.Get("Admin.CannotDeleteSelf"));
         if (await users.IsInRoleAsync(user, AdminAuthorization.Role)
             && (await users.GetUsersInRoleAsync(AdminAuthorization.Role)).Count <= 1)
-            return Problem(statusCode: 409, title: "Er moet minstens één beheerder overblijven.");
+            return Problem(statusCode: 409, title: Texts.Get("Admin.LastAdmin"));
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         foreach (var (household, _) in await households.SoleHouseholdsAsync(user.Id, ct))
             await households.DeleteHouseholdAsync(household.Id, ct);
         var result = await users.DeleteAsync(user);
-        if (!result.Succeeded) return Problem(statusCode: 500, title: "Verwijderen is mislukt.");
+        if (!result.Succeeded) return Problem(statusCode: 500, title: Texts.Get("Admin.DeleteFailed"));
         await transaction.CommitAsync(ct);
         return NoContent();
     });

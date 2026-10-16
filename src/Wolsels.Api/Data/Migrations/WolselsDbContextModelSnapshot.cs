@@ -577,6 +577,22 @@ namespace Wolsels.Api.Data.Migrations
                     b.ToTable("Locations");
                 });
 
+            modelBuilder.Entity("Wolsels.Api.Domain.UserSettings", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserSettings");
+                });
+
             modelBuilder.Entity("Wolsels.Api.Domain.Wool", b =>
                 {
                     b.Property<int>("Id")
@@ -790,6 +806,15 @@ namespace Wolsels.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Household");
+                });
+
+            modelBuilder.Entity("Wolsels.Api.Domain.UserSettings", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Wolsels.Api.Domain.WoolPhoto", b =>

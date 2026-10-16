@@ -26,7 +26,7 @@ public sealed class WoolRequest
     [Required, MaxLength(200)] public string Name { get; set; } = "";
     [Required, MaxLength(100)] public string WoolType { get; set; } = "";
     [Required, MaxLength(100)] public string Color { get; set; } = "";
-    [RegularExpression("^#[0-9a-fA-F]{6}$", ErrorMessage = "Gebruik een kleurcode als #a1b2c3.")]
+    [RegularExpression("^#[0-9a-fA-F]{6}$", ErrorMessage = "Validation.ColorHex")]
     public string? ColorHex { get; set; }
     [Range(0, 1_000_000)] public decimal WeightGrams { get; set; }
     [MaxLength(200)] public string? Origin { get; set; }

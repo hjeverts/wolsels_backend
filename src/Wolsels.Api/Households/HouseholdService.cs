@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Wolsels.Api.Data;
 using Wolsels.Api.Domain;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Households;
 
@@ -48,7 +49,7 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
         if (string.IsNullOrWhiteSpace(name))
         {
             var user = await users.FindByIdAsync(userId);
-            name = $"Huishouden van {user?.Email ?? "onbekend"}";
+            name = Texts.Get("Household.DefaultName", user?.Email ?? Texts.Get("Household.UnknownUser"));
         }
         var household = new Household { Name = name.Trim(), CreatedByUserId = userId, CreatedAt = now };
         db.Households.Add(household);
@@ -73,7 +74,7 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
         var open = await db.HouseholdInvites.CountAsync(i => i.HouseholdId == householdId && i.UsedAt == null && i.ExpiresAt > now, ct);
         if (open >= MaxOpenInvites)
             throw new HouseholdException(StatusCodes.Status409Conflict,
-                $"Er staan al {MaxOpenInvites} uitnodigingen open. Trek er eerst een in.");
+                Texts.Get("Household.TooManyInvites", MaxOpenInvites));
 
         var token = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
         var invite = new HouseholdInvite
@@ -99,16 +100,16 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
         if (invite is null || invite.UsedAt is not null || invite.ExpiresAt <= now) return null;
         var household = await db.Households.FirstAsync(h => h.Id == invite.HouseholdId, ct);
         var inviter = await users.FindByIdAsync(invite.CreatedByUserId);
-        return new InviteInfo(invite, household, inviter?.Email ?? "een lid");
+        return new InviteInfo(invite, household, inviter?.Email ?? Texts.Get("Household.SomeMember"));
     }
 
     /// <summary>Voegt de gebruiker toe aan het huishouden van de uitnodiging (naast zijn andere huishoudens).</summary>
     public async Task<Household> JoinAsync(string userId, string token, CancellationToken ct)
     {
         var info = await FindValidInviteAsync(token, ct)
-            ?? throw new HouseholdException(StatusCodes.Status400BadRequest, "Deze uitnodiging is ongeldig, verlopen of al gebruikt.");
+            ?? throw new HouseholdException(StatusCodes.Status400BadRequest, Texts.Get("Household.InviteInvalid"));
         if (await IsMemberAsync(userId, info.Household.Id, ct))
-            throw new HouseholdException(StatusCodes.Status409Conflict, "Je bent al lid van dit huishouden.");
+            throw new HouseholdException(StatusCodes.Status409Conflict, Texts.Get("Household.AlreadyMember"));
 
         var now = clock.GetUtcNow();
         db.HouseholdMembers.Add(new HouseholdMember { UserId = userId, HouseholdId = info.Household.Id, JoinedAt = now });
@@ -125,16 +126,16 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
     public async Task LeaveAsync(string userId, int householdId, CancellationToken ct)
     {
         await RemoveMembershipAsync(householdId, userId,
-            "Je bent het laatste lid van dit huishouden; verlaten kan pas als er nog iemand anders lid is.", ct);
+            Texts.Get("Household.LastMember"), ct);
     }
 
     /// <summary>Verwijdert een ander lid uit het huishouden.</summary>
     public async Task RemoveMemberAsync(int householdId, string userId, string memberUserId, CancellationToken ct)
     {
         if (memberUserId == userId)
-            throw new HouseholdException(StatusCodes.Status400BadRequest, "Gebruik 'Huishouden verlaten' om jezelf te verwijderen.");
+            throw new HouseholdException(StatusCodes.Status400BadRequest, Texts.Get("Household.UseLeave"));
         if (!await IsMemberAsync(memberUserId, householdId, ct))
-            throw new HouseholdException(StatusCodes.Status404NotFound, "Dit lid hoort niet bij dit huishouden.");
+            throw new HouseholdException(StatusCodes.Status404NotFound, Texts.Get("Household.MemberNotFound"));
         await RemoveMembershipAsync(householdId, memberUserId, "", ct);
     }
 
