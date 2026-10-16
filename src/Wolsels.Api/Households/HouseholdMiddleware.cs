@@ -13,6 +13,7 @@ namespace Wolsels.Api.Households;
 public class HouseholdMiddleware(RequestDelegate next)
 {
     public const string HeaderName = "X-Household";
+    public const string QueryName = "household";
 
     public async Task InvokeAsync(HttpContext context, ICurrentUser currentUser, HouseholdService households,
         UserManager<IdentityUser> users, SignInManager<IdentityUser> signIn)
@@ -38,7 +39,7 @@ public class HouseholdMiddleware(RequestDelegate next)
             }
 
             int? requested = null;
-            if (!path.StartsWithSegments("/api/households") && context.Request.Headers.TryGetValue(HeaderName, out var header))
+            if (!path.StartsWithSegments("/api/households") && TryGetRequested(context.Request, out var header))
             {
                 if (!int.TryParse(header, out var id))
                 {
@@ -56,6 +57,26 @@ public class HouseholdMiddleware(RequestDelegate next)
             }
         }
         await next(context);
+    }
+
+    /// <summary>
+    /// Het gevraagde huishouden uit de header, of bij GET uit <c>?household=</c>: een &lt;img&gt; kan geen header
+    /// meesturen. Alleen lezen, en het lidmaatschap wordt op dezelfde manier gecontroleerd.
+    /// </summary>
+    private static bool TryGetRequested(HttpRequest request, out string? value)
+    {
+        if (request.Headers.TryGetValue(HeaderName, out var header))
+        {
+            value = header;
+            return true;
+        }
+        if ((HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method)) && request.Query.TryGetValue(QueryName, out var query))
+        {
+            value = query;
+            return true;
+        }
+        value = null;
+        return false;
     }
 
     private static Task Reject(HttpContext context)

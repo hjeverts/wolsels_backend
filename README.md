@@ -111,7 +111,8 @@ mail gebruikt altijd `App__PublicUrl`, nooit de Host-header van het verzoek.
 | `/api/animals`                   | Dieren (CRUD), incl. totale opbrengst                     |
 | `POST /api/animals/import`       | Dieren importeren (max. 1000, alles of niets). Koppelt op naam: bestaande dieren overslaan, of met `updateExisting` alleen de velden uit `fields` bijwerken. Onbekende locaties worden aangemaakt. Fouten per regel (`line`) |
 | `/api/harvests`                  | Oogsten ruwe wol (CRUD), filter `animalId`, `locationId`, `year`, `woolId`. Met `addToStock` (+ optioneel `stockWoolId`) bij een nieuwe of bestaande partij; ook later voor een al opgeslagen oogst. Gewichtswijzigingen worden met de partij verrekend; `DELETE ?removeFromStock=true` haalt het gewicht ook van de partij af |
-| `POST /api/wools/{id}/merge`     | Partij samenvoegen met `targetWoolId`: gewicht, oogsten en mengsels gaan mee |
+| `POST /api/wools/{id}/merge`     | Partij samenvoegen met `targetWoolId`: gewicht, oogsten, mengsels en foto's gaan mee |
+| `/api/wools/{id}/photos`         | Foto's: `POST` (multipart `photo` + `thumbnail`, JPEG, max. 2048 resp. 512 px en 2 MB resp. 256 kB, max. 10 per partij), `GET /{photoId}` (`?size=thumb` voor de miniatuur), `DELETE /{photoId}`. Worden met de partij verwijderd. Voor `<img>` mag het huishouden bij GET als `?household=` in plaats van de header |
 | `GET /api/harvests/summary`      | Productie per maand en per dier/locatie (`?year=`)        |
 | `GET /api/settings`              | `maxBlendComponents`                                      |
 | `GET /health`                    | Healthcheck                                               |

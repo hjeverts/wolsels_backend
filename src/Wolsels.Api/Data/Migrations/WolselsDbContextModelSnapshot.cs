@@ -631,6 +631,39 @@ namespace Wolsels.Api.Data.Migrations
                     b.ToTable("Wools");
                 });
 
+            modelBuilder.Entity("Wolsels.Api.Domain.WoolPhoto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CreatedAt")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<int>("HouseholdId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("Thumbnail")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<int>("WoolId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HouseholdId");
+
+                    b.HasIndex("WoolId");
+
+                    b.ToTable("WoolPhotos");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -757,6 +790,15 @@ namespace Wolsels.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Household");
+                });
+
+            modelBuilder.Entity("Wolsels.Api.Domain.WoolPhoto", b =>
+                {
+                    b.HasOne("Wolsels.Api.Domain.Wool", null)
+                        .WithMany()
+                        .HasForeignKey("WoolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Wolsels.Api.Domain.Blend", b =>
