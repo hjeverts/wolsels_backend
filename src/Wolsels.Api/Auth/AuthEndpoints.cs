@@ -164,11 +164,11 @@ public static class AuthEndpoints
                     {
                         ["language"] = [Texts.Get("Language.Unsupported")],
                     });
-                if (await db.UserSettings.FindAsync([user.Id], http.RequestAborted) is { } settings)
-                    settings.Language = code;
-                else
-                    db.UserSettings.Add(new UserSettings { UserId = user.Id, Language = code });
-                await db.SaveChangesAsync(http.RequestAborted);
+                // Atomic upsert: two concurrent first saves (e.g. two tabs) must not both try to insert the row.
+                await db.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO "UserSettings" ("UserId", "Language") VALUES ({user.Id}, {code})
+                    ON CONFLICT ("UserId") DO UPDATE SET "Language" = excluded."Language"
+                    """, http.RequestAborted);
                 return Results.NoContent();
             })
             .RequireAuthorization();
