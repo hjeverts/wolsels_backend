@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Wolsels.Api.Contracts;
 using Wolsels.Api.Data;
 using Wolsels.Api.Domain;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Controllers;
 
@@ -53,13 +54,13 @@ public class WoolsController(WolselsDbContext db, TimeProvider clock) : Controll
     {
         if (id == request.TargetWoolId)
         {
-            ModelState.AddModelError(nameof(request.TargetWoolId), "Kies een andere partij om mee samen te voegen.");
+            ModelState.AddModelError(nameof(request.TargetWoolId), Texts.Get("Wools.MergeChooseOther"));
             return ValidationProblem(ModelState);
         }
         if (await db.Wools.FindAsync([id], ct) is not { } source) return NotFound();
         if (await db.Wools.FirstOrDefaultAsync(w => w.Id == request.TargetWoolId, ct) is not { } target)
         {
-            ModelState.AddModelError(nameof(request.TargetWoolId), "Deze voorraadpartij bestaat niet.");
+            ModelState.AddModelError(nameof(request.TargetWoolId), Texts.Get("Wools.NotFound"));
             return ValidationProblem(ModelState);
         }
 
@@ -69,7 +70,7 @@ public class WoolsController(WolselsDbContext db, TimeProvider clock) : Controll
         {
             if (await db.WoolPhotos.CountAsync(p => p.WoolId == id || p.WoolId == target.Id, ct) > WoolPhotosController.MaxPhotosPerWool)
                 return Problem(statusCode: StatusCodes.Status409Conflict,
-                    title: $"{WoolPhotosController.TooManyPhotos} Verwijder eerst foto's bij een van beide partijen.");
+                    title: Texts.Get("Wools.MergeTooManyPhotos", WoolPhotosController.MaxPhotosPerWool));
             await MergeAsync(id, source, target, ct);
         }
         finally
@@ -102,7 +103,7 @@ public class WoolsController(WolselsDbContext db, TimeProvider clock) : Controll
         if (await db.Wools.FindAsync([id], ct) is not { } wool) return NotFound();
         if (await db.BlendComponents.AnyAsync(c => c.WoolId == id, ct))
             return Problem(statusCode: StatusCodes.Status409Conflict,
-                title: "Deze wol wordt gebruikt in een mengsel en kan niet verwijderd worden.");
+                title: Texts.Get("Wools.InUse"));
         db.Wools.Remove(wool);
         await db.SaveChangesAsync(ct);
         return NoContent();

@@ -22,6 +22,7 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
     public DbSet<Household> Households => Set<Household>();
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
     public DbSet<HouseholdInvite> HouseholdInvites => Set<HouseholdInvite>();
+    public DbSet<UserSettings> UserSettings => Set<UserSettings>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -63,6 +64,13 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
             e.HasOne(m => m.Household).WithMany().HasForeignKey(m => m.HouseholdId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<IdentityUser>().WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(m => m.HouseholdId);
+        });
+        modelBuilder.Entity<UserSettings>(e =>
+        {
+            e.HasKey(s => s.UserId);
+            e.Property(s => s.UserId).HasMaxLength(450);
+            e.Property(s => s.Language).HasMaxLength(10);
+            e.HasOne<IdentityUser>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<HouseholdInvite>(e =>
         {

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Wolsels.Api.Contracts;
 using Wolsels.Api.Data;
 using Wolsels.Api.Domain;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Controllers;
 
@@ -55,7 +56,7 @@ public class LocationsController(WolselsDbContext db, TimeProvider clock) : Cont
         if (await db.Locations.FindAsync([id], ct) is not { } location) return NotFound();
         if (await db.Harvests.AnyAsync(h => h.LocationId == id, ct))
             return Problem(statusCode: StatusCodes.Status409Conflict,
-                title: "Op deze locatie zijn oogsten geboekt; verwijder die eerst.");
+                title: Texts.Get("Locations.HasHarvests"));
         db.Locations.Remove(location);
         await db.SaveChangesAsync(ct);
         return NoContent();

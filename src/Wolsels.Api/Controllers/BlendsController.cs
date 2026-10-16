@@ -4,6 +4,7 @@ using Wolsels.Api.Contracts;
 using Wolsels.Api.Data;
 using Wolsels.Api.Domain;
 using Wolsels.Api.Services;
+using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Controllers;
 
@@ -82,7 +83,7 @@ public class BlendsController(WolselsDbContext db, BlendCalculator calculator, T
         var wools = await db.Wools.Where(w => woolIds.Contains(w.Id)).ToDictionaryAsync(w => w.Id, ct);
         if (wools.Count != woolIds.Count)
         {
-            ModelState.AddModelError(nameof(request.Components), "Een of meer gekozen soorten wol bestaan niet meer.");
+            ModelState.AddModelError(nameof(request.Components), Texts.Get("Blends.WoolMissing"));
             return ValidationProblem(ModelState);
         }
 
@@ -107,12 +108,12 @@ public class BlendsController(WolselsDbContext db, BlendCalculator calculator, T
                 .GroupBy(x => x.WoolId)
                 .Select(g => (Wool: wools[g.Key], Needed: g.Sum(x => x.Weight)))
                 .Where(x => x.Needed > x.Wool.WeightGrams)
-                .Select(x => $"{x.Wool.Name}: {x.Needed:0.#} g nodig, {x.Wool.WeightGrams:0.#} g op voorraad")
+                .Select(x => Texts.Get("Blends.Shortage", x.Wool.Name, x.Needed, x.Wool.WeightGrams))
                 .ToList();
             if (shortages.Count > 0)
             {
                 ModelState.AddModelError(nameof(request.Components),
-                    "Onvoldoende voorraad om af te boeken. " + string.Join("; ", shortages) + ".");
+                    Texts.Get("Blends.InsufficientStock", string.Join("; ", shortages)));
                 return ValidationProblem(ModelState);
             }
             for (var i = 0; i < request.Components.Count; i++)

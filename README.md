@@ -100,6 +100,18 @@ Gegevens van vóór de invoering van accounts gaan naar het eerste huishouden.
 "Wachtwoord vergeten" werkt zodra `Smtp__Host`, `Smtp__From` en `App__PublicUrl` zijn ingesteld. De link in de
 mail gebruikt altijd `App__PublicUrl`, nooit de Host-header van het verzoek.
 
+## Talen
+
+Meldingen (foutmeldingen, validatie) komen in de taal uit de `Accept-Language`-header; de frontend stuurt de
+taal van de app mee. Zonder (ondersteunde) taal: Nederlands. De herstelmail gebruikt de taal uit het profiel.
+Vertalingen staan in `src/Wolsels.Api/Localization/Texts/<taal>.json` (`nl.json` is de bron; een test controleert
+dat elke taal dezelfde sleutels en parameters heeft).
+
+| Endpoint                   | Omschrijving                                                         |
+|----------------------------|----------------------------------------------------------------------|
+| `GET /api/auth/me`         | Bevat `language` (null voor een account zonder gekozen taal)         |
+| `PUT /api/auth/language`   | `{ "language": "de" }`; nl, de, en, fr, it, sv, nb, da, es, pt, pl   |
+
 ## API
 
 | Endpoint                         | Omschrijving                                              |
