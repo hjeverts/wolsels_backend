@@ -109,6 +109,7 @@ mail gebruikt altijd `App__PublicUrl`, nooit de Host-header van het verzoek.
 | `POST /api/blends/calculate`     | Verhouding omrekenen naar gewichten zonder op te slaan    |
 | `/api/locations`                 | Locaties (CRUD)                                           |
 | `/api/animals`                   | Dieren (CRUD), incl. totale opbrengst                     |
+| `POST /api/animals/import`       | Dieren importeren (max. 1000, alles of niets). Koppelt op naam: bestaande dieren overslaan, of met `updateExisting` alleen de velden uit `fields` bijwerken. Onbekende locaties worden aangemaakt. Fouten per regel (`line`) |
 | `/api/harvests`                  | Oogsten ruwe wol (CRUD), filter `animalId`, `locationId`, `year`, `woolId`. Met `addToStock` (+ optioneel `stockWoolId`) bij een nieuwe of bestaande partij; ook later voor een al opgeslagen oogst. Gewichtswijzigingen worden met de partij verrekend; `DELETE ?removeFromStock=true` haalt het gewicht ook van de partij af |
 | `POST /api/wools/{id}/merge`     | Partij samenvoegen met `targetWoolId`: gewicht, oogsten en mengsels gaan mee |
 | `GET /api/harvests/summary`      | Productie per maand en per dier/locatie (`?year=`)        |
