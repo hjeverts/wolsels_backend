@@ -129,7 +129,21 @@ De frontend heeft dezelfde berekening voor directe feedback; bij opslaan rekent 
 
 ## Docker
 
+GitHub Actions (`.github/workflows/image.yml`) draait bij elke push naar `main` de tests en zet de
+image op `ghcr.io/hjeverts/wolsels-backend` (tags `latest`, `sha-<commit>` en bij een git-tag `v1.2.3`
+ook `1.2.3` en `1.2`). Elke maandag wordt hij opnieuw gebouwd voor updates van de base-image.
+
+Zelf bouwen:
+
 ```sh
 docker build -t wolsels-backend .
 docker run -p 8080:8080 -v wolsels-data:/data wolsels-backend
 ```
+
+## Licentie
+
+Copyright (C) 2026 Hans Everts
+
+Dit programma is vrije software: je mag het verspreiden en/of aanpassen onder de voorwaarden van de
+[GNU Affero General Public License](LICENSE), versie 3. Bied je een aangepaste versie aan als
+webdienst, dan moet je de broncode van die versie ook beschikbaar stellen aan de gebruikers.
