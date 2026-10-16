@@ -125,7 +125,7 @@ public class AnimalsController(WolselsDbContext db, TimeProvider clock) : Contro
             if ((isNew || request.Has("species")) && row.Species.NullIfEmpty() is { } species) animal.Species = species;
             if (isNew || request.Has("breed")) animal.Breed = row.Breed.NullIfEmpty();
             if (isNew || request.Has("color")) animal.Color = row.Color.NullIfEmpty();
-            if (isNew || request.Has("birthDate")) animal.BirthDate = row.BirthDate;
+            if (isNew || request.Has("birthDate")) animal.BirthDate = row.BirthDateValue;
             if (isNew || request.Has("notes")) animal.Notes = row.Notes.NullIfEmpty();
             if (request.Has("active") && row.Active is { } active) animal.Active = active;
             if (isNew || request.Has("location"))

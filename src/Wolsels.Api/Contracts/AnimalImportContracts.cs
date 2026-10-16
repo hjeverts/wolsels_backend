@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
+using System.Text.Json.Serialization;
 
 namespace Wolsels.Api.Contracts;
 
@@ -43,6 +45,8 @@ public sealed class AnimalImportRequest : IValidatableObject
             var prefix = $"Regel {row.Line ?? i + 1}: ";
             if (string.IsNullOrWhiteSpace(row.Name))
                 yield return new ValidationResult(prefix + "naam ontbreekt.", [nameof(Rows)]);
+            if (!row.HasValidBirthDate)
+                yield return new ValidationResult($"{prefix}geboortedatum \"{row.BirthDate}\" is geen geldige datum (jjjj-mm-dd).", [nameof(Rows)]);
             foreach (var (value, max, label) in new[]
                      {
                          (row.Name, 200, "naam"), (row.Species, 100, "diersoort"), (row.Breed, 100, "ras"),
@@ -64,12 +68,25 @@ public sealed class AnimalImportRow
     public string? Species { get; set; }
     public string? Breed { get; set; }
     public string? Color { get; set; }
-    public DateOnly? BirthDate { get; set; }
+    /// <summary>
+    /// Als tekst (jjjj-mm-dd), zodat een ongeldige datum een fout met het regelnummer geeft in plaats van
+    /// een fout bij het inlezen van de JSON.
+    /// </summary>
+    public string? BirthDate { get; set; }
     /// <summary>Naam van de locatie; een onbekende locatie wordt aangemaakt.</summary>
     public string? Location { get; set; }
     /// <summary>Leeg: een nieuw dier is actief, een bestaand dier blijft ongewijzigd.</summary>
     public bool? Active { get; set; }
     public string? Notes { get; set; }
+
+    [JsonIgnore]
+    public DateOnly? BirthDateValue =>
+        DateOnly.TryParseExact(BirthDate?.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+            ? date
+            : null;
+
+    [JsonIgnore]
+    public bool HasValidBirthDate => string.IsNullOrWhiteSpace(BirthDate) || BirthDateValue is not null;
 }
 
 public sealed record AnimalImportResult(int Created, int Updated, int Skipped, IReadOnlyList<string> LocationsCreated);
