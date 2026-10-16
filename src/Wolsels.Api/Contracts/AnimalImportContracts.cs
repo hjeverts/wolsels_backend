@@ -35,6 +35,11 @@ public sealed class AnimalImportRequest : IValidatableObject
         for (var i = 0; i < Rows.Count && i < MaxRows; i++)
         {
             var row = Rows[i];
+            if (row is null)
+            {
+                yield return new ValidationResult($"Regel {i + 1}: dier ontbreekt.", [nameof(Rows)]);
+                continue;
+            }
             var prefix = $"Regel {row.Line ?? i + 1}: ";
             if (string.IsNullOrWhiteSpace(row.Name))
                 yield return new ValidationResult(prefix + "naam ontbreekt.", [nameof(Rows)]);
