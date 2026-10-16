@@ -106,7 +106,7 @@ public class AuthTests(WolselsFactory factory) : IClassFixture<WolselsFactory>
         var email = $"{Guid.NewGuid():N}@example.nl";
         var client = await factory.CreateUserClientAsync(email);
 
-        // Stap 1: gedeelde sleutel ophalen (voor de QR-code), stap 2: inschakelen met een code uit de app.
+        // Step 1: get the shared key (for the QR code), step 2: enable with a code from the app.
         var setup = await (await client.PostAsJsonAsync("/api/auth/manage/2fa", new { }))
             .Content.ReadFromJsonAsync<JsonElement>();
         var sharedKey = setup.GetProperty("sharedKey").GetString()!;
@@ -120,7 +120,7 @@ public class AuthTests(WolselsFactory factory) : IClassFixture<WolselsFactory>
         var me = await client.GetFromJsonAsync<JsonElement>("/api/auth/me");
         Assert.True(me.GetProperty("twoFactorEnabled").GetBoolean());
 
-        // Zonder code: geweigerd met de melding dat 2FA nodig is.
+        // Without a code: rejected with the message that 2FA is required.
         var fresh = factory.CreateClient();
         var withoutCode = await fresh.PostAsJsonAsync("/api/auth/login?useCookies=true",
             new { email, password = TestJson.Password });
@@ -136,7 +136,7 @@ public class AuthTests(WolselsFactory factory) : IClassFixture<WolselsFactory>
         Assert.Equal(HttpStatusCode.OK, withCode.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await fresh.GetAsync("/api/wools")).StatusCode);
 
-        // Herstelcode werkt ook, maar maar één keer.
+        // A recovery code works too, but only once.
         var recovery = factory.CreateClient();
         var withRecovery = await recovery.PostAsJsonAsync("/api/auth/login?useCookies=true",
             new { email, password = TestJson.Password, twoFactorRecoveryCode = recoveryCodes[0] });

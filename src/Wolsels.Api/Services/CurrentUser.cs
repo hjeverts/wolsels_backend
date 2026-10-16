@@ -6,7 +6,7 @@ public interface ICurrentUser
 {
     string? UserId { get; }
 
-    /// <summary>Huishouden van de ingelogde gebruiker; per verzoek opgezocht door <see cref="HouseholdMiddleware"/>.</summary>
+    /// <summary>Household of the logged-in user; looked up per request by <see cref="HouseholdMiddleware"/>.</summary>
     int? HouseholdId { get; }
 }
 

@@ -16,8 +16,8 @@ namespace Wolsels.Api.Auth;
 public static class AuthEndpoints
 {
     /// <summary>
-    /// Endpoints van ASP.NET Core Identity die niet gebruikt worden. Wachtwoord vergeten heeft eigen endpoints
-    /// hieronder, omdat die van Identity alleen werken voor bevestigde e-mailadressen.
+    /// ASP.NET Core Identity endpoints that are not used. Forgot password has its own endpoints
+    /// below, because Identity's only work for confirmed email addresses.
     /// </summary>
     private static readonly string[] DisabledPaths =
         ["/confirmEmail", "/resendConfirmationEmail", "/forgotPassword", "/resetPassword", "/refresh"];
@@ -38,8 +38,8 @@ public static class AuthEndpoints
     {
         var auth = app.MapGroup("/api/auth");
 
-        // /register, /login, /manage/2fa en /manage/info van Identity.
-        // Login: POST /api/auth/login?useCookies=true met { email, password, twoFactorCode?, twoFactorRecoveryCode? }.
+        // /register, /login, /manage/2fa and /manage/info from Identity.
+        // Login: POST /api/auth/login?useCookies=true with { email, password, twoFactorCode?, twoFactorRecoveryCode? }.
         var identity = auth.MapGroup("");
         identity.MapIdentityApi<IdentityUser>();
         identity.AddEndpointFilter(async (context, next) =>
@@ -54,7 +54,7 @@ public static class AuthEndpoints
             var services = context.HttpContext.RequestServices;
             var users = services.GetRequiredService<UserManager<IdentityUser>>();
             var allow = services.GetRequiredService<IOptions<AuthOptions>>().Value.AllowRegistration;
-            // Met een geldige uitnodiging (?invite=...) kan registreren ook als het verder uit staat.
+            // With a valid invitation (?invite=...) signing up works even when it is otherwise disabled.
             var invite = context.HttpContext.Request.Query["invite"].ToString();
             if (!allow && await users.Users.AnyAsync()
                 && await services.GetRequiredService<HouseholdService>().FindValidInviteAsync(invite, context.HttpContext.RequestAborted) is null)
@@ -62,7 +62,7 @@ public static class AuthEndpoints
                     title: Texts.Get("Registration.Disabled"));
 
             var result = await next(context);
-            // Het allereerste account wordt beheerder van de site.
+            // The very first account becomes the site administrator.
             if (context.Arguments.OfType<Microsoft.AspNetCore.Identity.Data.RegisterRequest>().FirstOrDefault() is { } request
                 && await users.FindByEmailAsync(request.Email) is { } created
                 && (await users.GetUsersInRoleAsync(Admin.AdminAuthorization.Role)).Count == 0)
@@ -77,8 +77,8 @@ public static class AuthEndpoints
                 new AuthOptionsDto(options.Value.AllowRegistration || !users.Users.Any(), PasswordResetAvailable(mail, app.Value)))
             .AllowAnonymous();
 
-        // Wachtwoord vergeten: stuurt een herstellink. Antwoordt altijd hetzelfde, zodat niet te achterhalen
-        // is welke e-mailadressen een account hebben.
+        // Forgot password: sends a reset link. Always gives the same response, so it cannot be found out
+        // which email addresses have an account.
         auth.MapPost("/password/forgot", async (ForgotPasswordRequest request, HttpContext http,
                 UserManager<IdentityUser> users, IMailSender mail, IOptions<AppOptions> app, IOptions<AuthOptions> authOptions,
                 IMemoryCache cache, TimeProvider clock, ILoggerFactory loggers, WolselsDbContext db) =>
@@ -87,9 +87,9 @@ public static class AuthEndpoints
                 if (await users.FindByEmailAsync(request.Email.Trim()) is { Email: { } email } user
                     && TryCountMail(cache, clock, email, authOptions.Value.PasswordResetPerEmailPerHour))
                 {
-                    // Nooit de Host-header van het verzoek gebruiken: die kan vervalst zijn (password reset poisoning).
+                    // Never use the request's Host header: it can be forged (password reset poisoning).
                     var link = app.Value.PublicUrl!.TrimEnd('/') + await PasswordResetLinks.CreatePathAsync(users, user);
-                    // De mail in de taal uit het profiel; zonder profieltaal die van het verzoek.
+                    // The mail in the profile language; without one, in the request language.
                     var language = (await db.UserSettings.FindAsync([user.Id], http.RequestAborted))?.Language ?? Texts.CurrentLanguage;
                     string T(string key) => Texts.GetFor(language, key);
                     string Html(string key) => WebUtility.HtmlEncode(T(key));
@@ -102,7 +102,7 @@ public static class AuthEndpoints
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        loggers.CreateLogger("Wolsels.Auth").LogError(ex, "Versturen van de herstelmail is mislukt");
+                        loggers.CreateLogger("Wolsels.Auth").LogError(ex, "Sending the password reset mail failed");
                         return Results.Problem(statusCode: StatusCodes.Status502BadGateway,
                             title: Texts.Get("PasswordReset.MailFailed"));
                     }
@@ -154,7 +154,7 @@ public static class AuthEndpoints
             })
             .RequireAuthorization();
 
-        // Taal van de app, opgeslagen in het profiel zodat die op elk apparaat geldt.
+        // App language, stored in the profile so that it applies on every device.
         auth.MapPut("/language", async (LanguageRequest request, HttpContext http, UserManager<IdentityUser> users,
                 WolselsDbContext db) =>
             {
@@ -173,7 +173,7 @@ public static class AuthEndpoints
             })
             .RequireAuthorization();
 
-        // Wachtwoord wijzigen en direct een nieuwe sessiecookie uitgeven (de security stamp verandert).
+        // Change the password and issue a new session cookie right away (the security stamp changes).
         auth.MapPost("/password", async (ChangePasswordRequest request, HttpContext http,
                 UserManager<IdentityUser> users, SignInManager<IdentityUser> signIn) =>
             {
@@ -186,7 +186,7 @@ public static class AuthEndpoints
             })
             .RequireAuthorization();
 
-        // Na het wijzigen van 2FA-instellingen de sessiecookie vernieuwen, anders volgt later een onverwachte uitlog.
+        // Renew the session cookie after changing 2FA settings, otherwise an unexpected logout follows later.
         auth.MapPost("/renew", async (HttpContext http, UserManager<IdentityUser> users, SignInManager<IdentityUser> signIn) =>
             {
                 if (await users.GetUserAsync(http.User) is not { } user) return Results.Unauthorized();
@@ -203,14 +203,14 @@ public static class AuthEndpoints
             .RequireAuthorization();
     }
 
-    /// <summary>Herstelmails vereisen een mailserver én een vaste openbare URL voor de link.</summary>
+    /// <summary>Reset mails require a mail server and a fixed public URL for the link.</summary>
     private static bool PasswordResetAvailable(IMailSender mail, AppOptions app) =>
         mail.IsConfigured && Uri.TryCreate(app.PublicUrl, UriKind.Absolute, out var url)
             && (url.Scheme == Uri.UriSchemeHttps || url.Scheme == Uri.UriSchemeHttp);
 
     /// <summary>
-    /// Telt herstelmails per e-mailadres in een venster van een uur. Boven de limiet wordt stil niets verstuurd,
-    /// zodat iemands mailbox niet bestookt kan worden en het antwoord niets verraadt.
+    /// Counts reset mails per email address in a one-hour window. Above the limit nothing is sent, silently,
+    /// so that nobody's mailbox can be flooded and the response gives nothing away.
     /// </summary>
     private static bool TryCountMail(IMemoryCache cache, TimeProvider clock, string email, int limit)
     {

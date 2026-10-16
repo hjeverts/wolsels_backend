@@ -26,7 +26,7 @@ public class BlendsController(WolselsDbContext db, BlendCalculator calculator, T
             ? BlendDto.From(blend)
             : NotFound();
 
-    /// <summary>Rekent een verhouding om naar gewichten zonder iets op te slaan.</summary>
+    /// <summary>Converts a ratio to weights without saving anything.</summary>
     [HttpPost("calculate")]
     public ActionResult<BlendCalculationResult> Calculate(BlendCalculationRequest request)
     {
@@ -70,7 +70,7 @@ public class BlendsController(WolselsDbContext db, BlendCalculator calculator, T
     {
         if (await db.Blends.Include(b => b.Components).FirstOrDefaultAsync(b => b.Id == id, ct) is not { } blend)
             return NotFound();
-        // Een verwijderd mengsel geeft de afgeboekte wol terug aan de voorraad.
+        // A deleted blend returns the deducted wool to stock.
         await RestoreStockAsync(blend, ct);
         db.Blends.Remove(blend);
         await db.SaveChangesAsync(ct);
@@ -99,7 +99,7 @@ public class BlendsController(WolselsDbContext db, BlendCalculator calculator, T
             return CalculationProblem(ex);
         }
 
-        // Eerst een eventuele eerdere afboeking terugdraaien, daarna opnieuw afboeken als het mengsel gesponnen is.
+        // First undo any earlier deduction, then deduct again if the blend has been spun.
         await RestoreStockAsync(blend, ct);
         if (request.Status == BlendStatus.Spun)
         {
@@ -158,7 +158,7 @@ public class BlendsController(WolselsDbContext db, BlendCalculator calculator, T
         return null;
     }
 
-    /// <summary>Boekt de eerder afgeboekte gewichten terug naar de voorraad (nog niet opgeslagen).</summary>
+    /// <summary>Returns the previously deducted weights to stock (not saved yet).</summary>
     private async Task RestoreStockAsync(Blend blend, CancellationToken ct)
     {
         if (!blend.StockDeducted) return;

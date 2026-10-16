@@ -38,7 +38,7 @@ public class BlendCalculatorTests
     [Fact]
     public void ComponentWeight_ScalesOtherComponents()
     {
-        // 50% merino, 30% alpaca, 20% zijde; 120 g alpaca bekend.
+        // 50% merino, 30% alpaca, 20% silk; 120 g of alpaca known.
         var result = _calculator.Calculate(new([50, 30, 20], CalculationBasis.ComponentWeight, null, 1, 120));
 
         Assert.Equal([200m, 120m, 80m], result.ComponentWeightsGrams);

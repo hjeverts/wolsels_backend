@@ -16,7 +16,7 @@ public class WolselsFactory : WebApplicationFactory<Program>
 
     protected virtual bool AllowRegistration => true;
 
-    /// <summary>Opgevangen e-mails in plaats van een echte mailserver.</summary>
+    /// <summary>Captured emails instead of a real mail server.</summary>
     public FakeMailSender Mail { get; } = new();
 
     protected virtual void Configure(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
@@ -37,7 +37,7 @@ public class WolselsFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services => services.AddSingleton<IMailSender>(Mail));
     }
 
-    /// <summary>Registreert een nieuwe gebruiker en geeft een ingelogde client terug.</summary>
+    /// <summary>Registers a new user and returns a logged-in client.</summary>
     public async Task<HttpClient> CreateUserClientAsync(string? email = null)
     {
         var client = CreateClient();
@@ -64,7 +64,7 @@ public static class TestJson
     };
 }
 
-/// <summary>Minimale TOTP-implementatie (RFC 6238) om een authenticator-app na te bootsen.</summary>
+/// <summary>Minimal TOTP implementation (RFC 6238) to imitate an authenticator app.</summary>
 public static class Totp
 {
     public static string Code(string base32Key, DateTimeOffset? at = null)

@@ -93,12 +93,12 @@ public sealed class HarvestRequest : IValidatableObject
     [MaxLength(100)] public string? Grade { get; set; }
     [MaxLength(4000)] public string? Notes { get; set; }
     /// <summary>
-    /// Voeg de oogst bij het opslaan toe aan de wolvoorraad, als dat nog niet gebeurd is: bij een bestaande partij
-    /// (<see cref="StockWoolId"/>) of als nieuwe partij.
+    /// Add the harvest to the wool stock when saving, if that hasn't happened yet: to an existing lot
+    /// (<see cref="StockWoolId"/>) or as a new lot.
     /// </summary>
     public bool AddToStock { get; set; }
 
-    /// <summary>Bestaande partij waar de oogst bij wordt geteld; leeg = nieuwe partij.</summary>
+    /// <summary>Existing lot the harvest is added to; empty = new lot.</summary>
     public int? StockWoolId { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

@@ -13,7 +13,7 @@ namespace Wolsels.Api.Tests;
 
 public class JpegInfoTests
 {
-    /// <summary>Een echte (progressieve) JPEG van 37×21 pixels met EXIF-blok, gemaakt met Pillow.</summary>
+    /// <summary>A real (progressive) 37×21 pixel JPEG with an EXIF block, made with Pillow.</summary>
     private static readonly byte[] RealJpeg = Convert.FromBase64String("/9j/4AAQSkZJRgABAQAAAQABAAD/4QAWRXhpZgAATU0AKgAAAAgAAAAAAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wgARCAAVACUDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAP/xAAVAQEBAAAAAAAAAAAAAAAAAAAABf/aAAwDAQACEAMQAAABoIFsAAAAD//EABQQAQAAAAAAAAAAAAAAAAAAADD/2gAIAQEAAQUCf//EABQRAQAAAAAAAAAAAAAAAAAAACD/2gAIAQMBAT8BX//EABQRAQAAAAAAAAAAAAAAAAAAACD/2gAIAQIBAT8BX//EABQQAQAAAAAAAAAAAAAAAAAAADD/2gAIAQEABj8Cf//EABQQAQAAAAAAAAAAAAAAAAAAADD/2gAIAQEAAT8hf//aAAwDAQACAAMAAAAQ++++++//xAAUEQEAAAAAAAAAAAAAAAAAAAAg/9oACAEDAQE/EF//xAAUEQEAAAAAAAAAAAAAAAAAAAAg/9oACAECAQE/EF//xAAUEAEAAAAAAAAAAAAAAAAAAAAw/9oACAEBAAE/EH//2Q==");
 
     [Fact]
@@ -32,15 +32,15 @@ public class JpegInfoTests
 
     [Theory]
     [InlineData(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A })] // PNG
-    [InlineData(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0xFF })] // afgekapt
-    [InlineData(new byte[] { 0xFF, 0xD8, 0xFF, 0xD9 })] // geen SOF
+    [InlineData(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0xFF })] // truncated
+    [InlineData(new byte[] { 0xFF, 0xD8, 0xFF, 0xD9 })] // no SOF
     [InlineData(new byte[] { })]
     public void RejectsOtherData(byte[] data) => Assert.False(JpegInfo.TryReadSize(data, out _, out _));
 }
 
 public class WoolPhotoTests(WolselsFactory factory) : IClassFixture<WolselsFactory>
 {
-    /// <summary>Kleinste geldige JPEG-kop met de gegeven afmetingen (SOI, SOF0, EOI).</summary>
+    /// <summary>Smallest valid JPEG header with the given dimensions (SOI, SOF0, EOI).</summary>
     public static byte[] Jpeg(int width, int height, int padding = 0) =>
     [
         0xFF, 0xD8,
@@ -120,7 +120,7 @@ public class WoolPhotoTests(WolselsFactory factory) : IClassFixture<WolselsFacto
         var revalidated = await client.SendAsync(Conditional(client));
         Assert.Equal(HttpStatusCode.NotModified, revalidated.StatusCode);
 
-        // Iemand anders in dezelfde browser (zelfde cache, zelfde ETag) krijgt de foto niet.
+        // Someone else in the same browser (same cache, same ETag) doesn't get the photo.
         var other = await factory.CreateUserClientAsync();
         Assert.Equal(HttpStatusCode.NotFound, (await other.SendAsync(Conditional(other))).StatusCode);
         await client.DeleteAsync(url);
@@ -252,7 +252,7 @@ public class WoolPhotoTests(WolselsFactory factory) : IClassFixture<WolselsFacto
         Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync($"/api/wools/{wool}/photos/{photo}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await other.DeleteAsync($"/api/wools/{wool}/photos/{photo}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await UploadAsync(other, wool, Jpeg(800, 600), Jpeg(200, 150))).StatusCode);
-        // Ook niet door het huishouden van de eigenaar in de URL te zetten.
+        // Not even by putting the owner's household in the URL.
         Assert.Equal(HttpStatusCode.Forbidden,
             (await other.GetAsync($"/api/wools/{wool}/photos/{photo}?{HouseholdMiddleware.QueryName}={ownHousehold}")).StatusCode);
     }
@@ -269,7 +269,7 @@ public class WoolPhotoTests(WolselsFactory factory) : IClassFixture<WolselsFacto
 
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/wools/{wool}/photos/{photo}?household={first}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/wools/{wool}/photos/{photo}?household={second}")).StatusCode);
-        // Een ongeldige waarde wordt geweigerd, net als bij de header.
+        // An invalid value is rejected, just like with the header.
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"/api/wools/{wool}/photos/{photo}?household=abc")).StatusCode);
     }
 }

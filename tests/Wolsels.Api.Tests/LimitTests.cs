@@ -29,7 +29,7 @@ public class PasswordResetTests(WolselsFactory factory) : IClassFixture<WolselsF
             new { email, password = "nieuw wachtwoord na herstel" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
 
-        // De link is na gebruik ongeldig (security stamp is veranderd).
+        // The link is invalid after use (the security stamp has changed).
         var again = await anonymous.PostAsJsonAsync("/api/auth/password/reset",
             new { email, code, newPassword = "nog een ander wachtwoord" });
         Assert.Equal(HttpStatusCode.BadRequest, again.StatusCode);
@@ -98,7 +98,7 @@ public class PasswordResetWithoutPublicUrlTests(NoPublicUrlFactory factory) : IC
     }
 }
 
-/// <summary>Draait met lage limieten, zodat de begrenzing zelf getest kan worden.</summary>
+/// <summary>Runs with low limits, so that the limiting itself can be tested.</summary>
 public sealed class StrictLimitsFactory : WolselsFactory
 {
     protected override void Configure(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
@@ -126,7 +126,7 @@ public class RateLimitTests(StrictLimitsFactory factory) : IClassFixture<StrictL
         Assert.Equal(HttpStatusCode.Unauthorized, statuses[0]);
         Assert.Equal(HttpStatusCode.TooManyRequests, statuses[^1]);
 
-        // Niet-gevoelige endpoints vallen er niet onder.
+        // Non-sensitive endpoints are not affected.
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/auth/options")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
     }

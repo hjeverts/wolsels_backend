@@ -66,8 +66,8 @@ public class AnimalsController(WolselsDbContext db, TimeProvider clock) : Contro
     }
 
     /// <summary>
-    /// Importeert dieren in één keer: bij een fout wordt niets opgeslagen. Dieren worden op naam (zonder
-    /// onderscheid in hoofdletters) gekoppeld; onbekende locaties worden aangemaakt.
+    /// Imports animals in one go: on an error nothing is saved. Animals are matched by name
+    /// (case-insensitive); unknown locations are created.
     /// </summary>
     [HttpPost("import")]
     public async Task<ActionResult<AnimalImportResult>> Import(AnimalImportRequest request, CancellationToken ct)
@@ -122,7 +122,7 @@ public class AnimalsController(WolselsDbContext db, TimeProvider clock) : Contro
             }
             animal.UpdatedAt = now;
 
-            // Een bestaand dier houdt zijn diersoort als die in het bestand leeg is; diersoort is verplicht.
+            // An existing animal keeps its species if it is empty in the file; species is required.
             if ((isNew || request.Has("species")) && row.Species.NullIfEmpty() is { } species) animal.Species = species;
             if (isNew || request.Has("breed")) animal.Breed = row.Breed.NullIfEmpty();
             if (isNew || request.Has("color")) animal.Color = row.Color.NullIfEmpty();

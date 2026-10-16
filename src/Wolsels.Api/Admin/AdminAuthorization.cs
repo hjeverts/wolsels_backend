@@ -17,9 +17,9 @@ public static class AdminAuthorization
     }
 
     /// <summary>
-    /// Zorgt dat de beheerdersrol bestaat en dat er minstens één beheerder is: bij een bestaande installatie
-    /// wordt de maker van het eerste huishouden beheerder. Daarnaast wordt Auth:AdminEmail (indien ingesteld)
-    /// altijd beheerder, om toegang te kunnen herstellen.
+    /// Makes sure the administrator role exists and that there is at least one administrator: in an existing
+    /// installation the creator of the first household becomes administrator. In addition Auth:AdminEmail (if set)
+    /// always becomes administrator, so that access can be restored.
     /// </summary>
     public static async Task EnsureAdminsAsync(IServiceProvider services, string? adminEmail, ILogger logger)
     {
@@ -32,7 +32,7 @@ public static class AdminAuthorization
             if (await users.FindByEmailAsync(adminEmail) is { } configured && !await users.IsInRoleAsync(configured, Role))
             {
                 await users.AddToRoleAsync(configured, Role);
-                logger.LogWarning("{Email} is beheerder gemaakt via Auth:AdminEmail", adminEmail);
+                logger.LogWarning("{Email} was made administrator via Auth:AdminEmail", adminEmail);
             }
         }
 
@@ -43,14 +43,14 @@ public static class AdminAuthorization
         if (firstUserId is not null && await users.FindByIdAsync(firstUserId) is { } first)
         {
             await users.AddToRoleAsync(first, Role);
-            logger.LogInformation("{Email} is beheerder gemaakt (eerste account)", first.Email);
+            logger.LogInformation("{Email} was made administrator (first account)", first.Email);
         }
     }
 }
 
 public sealed class AdminRequirement : IAuthorizationRequirement;
 
-/// <summary>Controleert de rol per verzoek in de database, zodat intrekken direct effect heeft.</summary>
+/// <summary>Checks the role in the database per request, so that revoking takes effect immediately.</summary>
 public sealed class AdminRequirementHandler(UserManager<IdentityUser> users) : AuthorizationHandler<AdminRequirement>
 {
     protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, AdminRequirement requirement)

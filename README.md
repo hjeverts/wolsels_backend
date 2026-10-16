@@ -1,172 +1,170 @@
 # Wolsels backend
 
-REST API (ASP.NET Core / .NET 10, EF Core + SQLite) voor Wolsels: wolvoorraad, mengsels met
-mengverhoudingen, spinresultaten (opbrengst, garendikte, twijnen, verven) en de productie van ruwe wol
-door eigen dieren.
+REST API (ASP.NET Core / .NET 10, EF Core + SQLite) for Wolsels: wool stock, blends with blend ratios,
+spinning results (yield, yarn weight, plying, dyeing) and the production of raw wool by your own animals.
 
-Hoort bij [wolsels_frontend](https://github.com/hjeverts/wolsels_frontend) en [wolsels_deploy](https://github.com/hjeverts/wolsels_deploy).
+Belongs with [wolsels_frontend](https://github.com/hjeverts/wolsels_frontend) and [wolsels_deploy](https://github.com/hjeverts/wolsels_deploy).
 
-## Ontwikkelen
+## Development
 
 ```sh
 dotnet run --project src/Wolsels.Api      # http://localhost:5262
 dotnet test
 ```
 
-De database (`data/wolsels.db`) wordt bij het opstarten aangemaakt en gemigreerd.
-OpenAPI-document in development: `GET /openapi/v1.json`.
+The database (`data/wolsels.db`) is created and migrated at startup.
+OpenAPI document in development: `GET /openapi/v1.json`.
 
-Nieuwe migratie na een modelwijziging:
+New migration after a model change:
 
 ```sh
 dotnet tool restore
-dotnet ef migrations add <Naam> -p src/Wolsels.Api -o Data/Migrations
+dotnet ef migrations add <Name> -p src/Wolsels.Api -o Data/Migrations
 ```
 
-## Configuratie
+## Configuration
 
-| Instelling                     | Standaard                     | Omschrijving                               |
+| Setting                        | Default                       | Description                                |
 |--------------------------------|-------------------------------|--------------------------------------------|
-| `ConnectionStrings__Wolsels`   | `Data Source=data/wolsels.db` | SQLite-database (in Docker `/data/...`)    |
-| `Blends__MaxComponents`        | `6`                           | Maximaal aantal soorten wol in een mengsel |
-| `Auth__AllowRegistration`      | `true`                        | Zelf registreren toestaan (het eerste account mag altijd) |
-| `Auth__RateLimitPerMinute`     | `10`                          | Max. auth-verzoeken per IP per minuut      |
-| `DataProtection__KeysPath`     | `data/keys`                   | Sleutels voor sessiecookies (bewaren!)     |
-| `App__PublicUrl`               | –                             | Openbare URL, voor links in e-mails        |
-| `Smtp__Host` / `Port` / `Security` / `Username` / `Password` / `From` / `FromName` | – | Mailserver voor wachtwoordherstel |
-| `Auth__RateLimitPerHour`       | `60`                          | Max. auth-verzoeken per IP per uur         |
-| `Auth__PasswordResetPerIpPerHour` / `PerEmailPerHour` | `5` / `3` | Limieten herstelmails          |
-| `Auth__MaxFailedAccessAttempts` / `LockoutMinutes` | `5` / `15` | Accountblokkering                   |
-| `Auth__AdminEmail`             | –                             | Dit account wordt altijd beheerder         |
+| `ConnectionStrings__Wolsels`   | `Data Source=data/wolsels.db` | SQLite database (in Docker `/data/...`)    |
+| `Blends__MaxComponents`        | `6`                           | Maximum number of wools in a blend         |
+| `Auth__AllowRegistration`      | `true`                        | Allow self sign-up (the first account is always allowed) |
+| `Auth__RateLimitPerMinute`     | `10`                          | Max. auth requests per IP per minute       |
+| `DataProtection__KeysPath`     | `data/keys`                   | Keys for session cookies (keep them!)      |
+| `App__PublicUrl`               | –                             | Public URL, for links in emails            |
+| `Smtp__Host` / `Port` / `Security` / `Username` / `Password` / `From` / `FromName` | – | Mail server for password resets |
+| `Auth__RateLimitPerHour`       | `60`                          | Max. auth requests per IP per hour         |
+| `Auth__PasswordResetPerIpPerHour` / `PerEmailPerHour` | `5` / `3` | Limits for reset mails         |
+| `Auth__MaxFailedAccessAttempts` / `LockoutMinutes` | `5` / `15` | Account lockout                     |
+| `Auth__AdminEmail`             | –                             | This account always becomes administrator  |
 
-## Huishoudens
+## Households
 
-Gegevens (wol, mengsels, dieren, locaties, oogsten) horen bij een **huishouden**. Meerdere accounts kunnen
-één huishouden delen, en een account kan lid zijn van meerdere huishoudens. De frontend stuurt per verzoek
-`X-Household: <id>` mee; de backend controleert bij elk verzoek of de gebruiker daar lid van is (403
-`household-access` als dat niet zo is). Zonder header geldt het eerste huishouden van de gebruiker.
+Data (wool, blends, animals, locations, harvests) belongs to a **household**. Several accounts can share
+one household, and an account can be a member of several households. The frontend sends
+`X-Household: <id>` with every request; the backend checks on every request that the user is a member of it
+(403 `household-access` if not). Without the header the user's first household applies.
 
-| Endpoint                                   | Omschrijving                                                 |
+| Endpoint                                   | Description                                                  |
 |--------------------------------------------|--------------------------------------------------------------|
-| `GET/POST /api/households`                 | Mijn huishoudens / nieuw huishouden aanmaken                 |
-| `GET/PUT /api/household`                   | Actief huishouden: leden, open uitnodigingen / naam wijzigen |
-| `POST /api/household/invites`              | Uitnodigingslink maken (eenmalig, 7 dagen; alleen de hash wordt opgeslagen) |
-| `DELETE /api/household/invites/{id}`       | Uitnodiging intrekken                                        |
-| `GET /api/household/invites/{token}`       | Info over een uitnodiging (zonder login)                     |
-| `POST /api/household/join`                 | Lid worden met een uitnodiging                               |
-| `POST /api/household/leave`                | Actief huishouden verlaten (niet als laatste lid)            |
-| `DELETE /api/household/members/{userId}`   | Lid verwijderen                                              |
+| `GET/POST /api/households`                 | My households / create a new household                       |
+| `GET/PUT /api/household`                   | Active household: members, open invitations / rename         |
+| `POST /api/household/invites`              | Create an invitation link (single use, 7 days; only the hash is stored) |
+| `DELETE /api/household/invites/{id}`       | Revoke an invitation                                         |
+| `GET /api/household/invites/{token}`       | Info about an invitation (without login)                     |
+| `POST /api/household/join`                 | Join with an invitation                                      |
+| `POST /api/household/leave`                | Leave the active household (not as the last member)          |
+| `DELETE /api/household/members/{userId}`   | Remove a member                                              |
 
-Registreren met `?invite=<token>` werkt ook als registreren verder uit staat.
+Signing up with `?invite=<token>` also works when sign-up is otherwise disabled.
 
-## Beheer
+## Administration
 
-Het eerste account is **beheerder** (bij bestaande installaties: de maker van het eerste huishouden).
-`Auth__AdminEmail` maakt een account bij het opstarten altijd beheerder, om toegang te herstellen.
-Rechten worden per verzoek gecontroleerd. Beheerders beheren accounts, maar zien geen gegevens van
-huishoudens.
+The first account is **administrator** (in existing installations: the creator of the first household).
+`Auth__AdminEmail` always makes an account administrator at startup, to restore access.
+Permissions are checked per request. Administrators manage accounts, but don't see household data.
 
-| Endpoint                                     | Omschrijving                                         |
+| Endpoint                                     | Description                                          |
 |----------------------------------------------|------------------------------------------------------|
-| `GET /api/admin/users`                       | Alle accounts met 2FA-status, blokkade, huishoudens  |
-| `POST /api/admin/users/{id}/block`/`unblock` | Blokkeren (sessie vervalt direct) / deblokkeren      |
-| `POST /api/admin/users/{id}/reset-2fa`       | 2FA uitschakelen (telefoon en herstelcodes kwijt)    |
-| `POST /api/admin/users/{id}/password-reset`  | Herstellink om zelf te delen (ook zonder mailserver) |
-| `PUT /api/admin/users/{id}/admin`            | Beheerder maken/afnemen (laatste beheerder blijft)   |
-| `GET /api/admin/users/{id}/delete-preview`   | Welke huishoudens (alleen dit lid) meeverdwijnen     |
-| `DELETE /api/admin/users/{id}`               | Account verwijderen                                  |
+| `GET /api/admin/users`                       | All accounts with 2FA status, block status, households |
+| `POST /api/admin/users/{id}/block`/`unblock` | Block (session ends immediately) / unblock           |
+| `POST /api/admin/users/{id}/reset-2fa`       | Turn off 2FA (lost phone and recovery codes)         |
+| `POST /api/admin/users/{id}/password-reset`  | Reset link to share yourself (also without a mail server) |
+| `PUT /api/admin/users/{id}/admin`            | Grant/revoke administrator (the last administrator stays) |
+| `GET /api/admin/users/{id}/delete-preview`   | Which households (only this member) are deleted too  |
+| `DELETE /api/admin/users/{id}`               | Delete the account                                   |
 
-## Accounts en 2FA
+## Accounts and 2FA
 
-Gebaseerd op ASP.NET Core Identity met een sessiecookie (`wolsels.auth`, HttpOnly, SameSite=Strict).
-Elk huishouden ziet alleen zijn eigen gegevens (EF Core query filters op `HouseholdId`). Wachtwoorden
-minimaal 10 tekens; na 5 foute pogingen (wachtwoord of 2FA-code) is een account 15 minuten geblokkeerd.
-Daarnaast geldt een limiet per IP-adres per minuut en per uur op alle gevoelige auth-endpoints.
-Gegevens van vóór de invoering van accounts gaan naar het eerste huishouden.
+Based on ASP.NET Core Identity with a session cookie (`wolsels.auth`, HttpOnly, SameSite=Strict).
+Each household only sees its own data (EF Core query filters on `HouseholdId`). Passwords are at least
+10 characters; after 5 failed attempts (password or 2FA code) an account is locked for 15 minutes.
+In addition there is a per-IP limit per minute and per hour on all sensitive auth endpoints.
+Data from before accounts were introduced goes to the first household.
 
-| Endpoint                                 | Omschrijving                                                     |
+| Endpoint                                 | Description                                                      |
 |------------------------------------------|------------------------------------------------------------------|
 | `POST /api/auth/register`                | `{ email, password }`                                            |
-| `POST /api/auth/login?useCookies=true`   | `{ email, password, twoFactorCode?, twoFactorRecoveryCode? }`; 401 met `RequiresTwoFactor` als een code nodig is |
-| `POST /api/auth/logout`                  | Uitloggen                                                        |
-| `GET /api/auth/me`                       | E-mail, 2FA-status, resterende herstelcodes                      |
-| `GET /api/auth/options`                  | Of registreren mogelijk is                                       |
-| `POST /api/auth/manage/2fa`              | 2FA (TOTP): sleutel ophalen, inschakelen, uitschakelen, herstelcodes resetten |
-| `POST /api/auth/password/forgot`         | Herstelmail (alleen met mailserver én `App__PublicUrl`) |
-| `POST /api/auth/password/reset`          | Nieuw wachtwoord met code uit de mail                 |
-| `POST /api/auth/password`                | Wachtwoord wijzigen (`oldPassword`, `newPassword`), sessie blijft geldig |
-| `POST /api/auth/renew`                   | Sessiecookie vernieuwen na het wijzigen van 2FA-instellingen     |
+| `POST /api/auth/login?useCookies=true`   | `{ email, password, twoFactorCode?, twoFactorRecoveryCode? }`; 401 with `RequiresTwoFactor` when a code is needed |
+| `POST /api/auth/logout`                  | Log out                                                          |
+| `GET /api/auth/me`                       | Email, 2FA status, remaining recovery codes, language            |
+| `GET /api/auth/options`                  | Whether sign-up is possible                                      |
+| `POST /api/auth/manage/2fa`              | 2FA (TOTP): get the key, enable, disable, reset recovery codes   |
+| `POST /api/auth/password/forgot`         | Reset mail (only with a mail server and `App__PublicUrl`)        |
+| `POST /api/auth/password/reset`          | New password with the code from the mail                         |
+| `POST /api/auth/password`                | Change password (`oldPassword`, `newPassword`), the session stays valid |
+| `POST /api/auth/renew`                   | Renew the session cookie after changing 2FA settings             |
 
-"Wachtwoord vergeten" werkt zodra `Smtp__Host`, `Smtp__From` en `App__PublicUrl` zijn ingesteld. De link in de
-mail gebruikt altijd `App__PublicUrl`, nooit de Host-header van het verzoek.
+"Forgot password" works once `Smtp__Host`, `Smtp__From` and `App__PublicUrl` are set. The link in the mail
+always uses `App__PublicUrl`, never the request's Host header.
 
-## Talen
+## Languages
 
-Meldingen (foutmeldingen, validatie) komen in de taal uit de `Accept-Language`-header; de frontend stuurt de
-taal van de app mee. Zonder (ondersteunde) taal: Nederlands. De herstelmail gebruikt de taal uit het profiel.
-Vertalingen staan in `src/Wolsels.Api/Localization/Texts/<taal>.json` (`nl.json` is de bron; een test controleert
-dat elke taal dezelfde sleutels en parameters heeft).
+Messages (errors, validation) are returned in the language from the `Accept-Language` header; the frontend
+sends the app language. Without a (supported) language: Dutch. The password reset mail uses the language from
+the profile. Translations live in `src/Wolsels.Api/Localization/Texts/<language>.json` (`nl.json` is the source;
+a test checks that every language has the same keys and parameters).
 
-| Endpoint                   | Omschrijving                                                         |
+| Endpoint                   | Description                                                          |
 |----------------------------|----------------------------------------------------------------------|
-| `GET /api/auth/me`         | Bevat `language` (null voor een account zonder gekozen taal)         |
+| `GET /api/auth/me`         | Contains `language` (null for an account without a chosen language) |
 | `PUT /api/auth/language`   | `{ "language": "de" }`; nl, de, en, fr, it, sv, nb, da, es, pt, pl   |
 
 ## API
 
-| Endpoint                         | Omschrijving                                              |
+| Endpoint                         | Description                                               |
 |----------------------------------|-----------------------------------------------------------|
-| `/api/wools`                     | Wolvoorraad (CRUD)                                        |
-| `/api/blends`                    | Mengsels (CRUD); gewichten worden server-side berekend. Status `Spun` boekt de wol af van de voorraad; terugzetten, aanpassen of verwijderen verrekent dat weer |
-| `POST /api/blends/calculate`     | Verhouding omrekenen naar gewichten zonder op te slaan    |
-| `/api/locations`                 | Locaties (CRUD)                                           |
-| `/api/animals`                   | Dieren (CRUD), incl. totale opbrengst                     |
-| `POST /api/animals/import`       | Dieren importeren (max. 1000, alles of niets). Koppelt op naam: bestaande dieren overslaan, of met `updateExisting` alleen de velden uit `fields` bijwerken. Onbekende locaties worden aangemaakt. Fouten per regel (`line`) |
-| `/api/harvests`                  | Oogsten ruwe wol (CRUD), filter `animalId`, `locationId`, `year`, `woolId`. Met `addToStock` (+ optioneel `stockWoolId`) bij een nieuwe of bestaande partij; ook later voor een al opgeslagen oogst. Gewichtswijzigingen worden met de partij verrekend; `DELETE ?removeFromStock=true` haalt het gewicht ook van de partij af |
-| `POST /api/wools/{id}/merge`     | Partij samenvoegen met `targetWoolId`: gewicht, oogsten, mengsels en foto's gaan mee |
-| `/api/wools/{id}/photos`         | Foto's: `POST` (multipart `photo` + `thumbnail`, JPEG, max. 2048 resp. 512 px en 2 MB resp. 256 kB, max. 10 per partij), `GET /{photoId}` (`?size=thumb` voor de miniatuur; `no-cache` met ETag, dus elke keer langs de autorisatie), `DELETE /{photoId}`. Worden met de partij verwijderd; samenvoegen boven de 10 geeft 409. Voor `<img>` mag het huishouden bij GET als `?household=` in plaats van de header |
-| `GET /api/harvests/summary`      | Productie per maand en per dier/locatie (`?year=`)        |
+| `/api/wools`                     | Wool stock (CRUD)                                         |
+| `/api/blends`                    | Blends (CRUD); weights are calculated server-side. Status `Spun` deducts the wool from stock; setting it back, changing or deleting settles that again |
+| `POST /api/blends/calculate`     | Convert a ratio to weights without saving                 |
+| `/api/locations`                 | Locations (CRUD)                                          |
+| `/api/animals`                   | Animals (CRUD), incl. total yield                         |
+| `POST /api/animals/import`       | Import animals (max. 1000, all or nothing). Matches by name: skip existing animals, or with `updateExisting` only update the fields in `fields`. Unknown locations are created. Errors per line (`line`) |
+| `/api/harvests`                  | Raw wool harvests (CRUD), filter `animalId`, `locationId`, `year`, `woolId`. With `addToStock` (+ optional `stockWoolId`) to a new or existing lot; also later for an already saved harvest. Weight changes are settled with the lot; `DELETE ?removeFromStock=true` also subtracts the weight from the lot |
+| `POST /api/wools/{id}/merge`     | Merge a lot into `targetWoolId`: weight, harvests, blends and photos move along |
+| `/api/wools/{id}/photos`         | Photos: `POST` (multipart `photo` + `thumbnail`, JPEG, max. 2048 resp. 512 px and 2 MB resp. 256 kB, max. 10 per lot), `GET /{photoId}` (`?size=thumb` for the thumbnail; `no-cache` with ETag, so authorisation is checked every time), `DELETE /{photoId}`. Deleted along with the lot; merging above 10 gives 409. For `<img>` the household may be passed as `?household=` on GET instead of the header |
+| `GET /api/harvests/summary`      | Production per month and per animal/location (`?year=`)   |
 | `GET /api/settings`              | `maxBlendComponents`                                      |
-| `GET /health`                    | Healthcheck                                               |
+| `GET /health`                    | Health check                                              |
 
-### Mengverhouding
+### Blend ratio
 
-Een verhouding mag in delen (`3:2`) of procenten (`60:40`); hij wordt genormaliseerd. Gewichten
-worden berekend vanuit:
+A ratio may be given in parts (`3:2`) or percentages (`60:40`); it is normalised. Weights are calculated
+from:
 
-- **`TotalWeight`** – het totale inputgewicht (`totalWeightGrams`). Afronding op 0,1 g met de
-  grootste-restmethode, zodat de som altijd exact het totaal is.
-- **`ComponentWeight`** – het gewicht van één soort (`basisComponentIndex` +
-  `basisComponentWeightGrams`). Die soort houdt exact dat gewicht; de rest schaalt mee.
+- **`TotalWeight`** – the total input weight (`totalWeightGrams`). Rounded to 0.1 g with the largest
+  remainder method, so that the sum is always exactly the total.
+- **`ComponentWeight`** – the weight of one wool (`basisComponentIndex` + `basisComponentWeightGrams`).
+  That wool keeps exactly that weight; the rest scales along.
 
-De frontend heeft dezelfde berekening voor directe feedback; bij opslaan rekent de backend opnieuw.
+The frontend has the same calculation for immediate feedback; on save the backend calculates again.
 
 ## Docker
 
-GitHub Actions (`.github/workflows/image.yml`) draait bij elke pull request en push naar `main` de
-tests. Een image wordt alleen gebouwd voor een versietag:
+GitHub Actions (`.github/workflows/image.yml`) runs the tests on every pull request and push to `main`.
+An image is only built for a version tag:
 
 ```sh
 git switch main && git pull
-git tag v1.2.0 && git push origin v1.2.0     # of via GitHub: Releases → Draft a new release
+git tag v1.2.0 && git push origin v1.2.0     # or via GitHub: Releases → Draft a new release
 ```
 
-De image komt op `ghcr.io/hjeverts/wolsels-backend` met de tags `1.2.0`, `1.2` en, als het de nieuwste
-versie is, `latest`. Gebruik [semver](https://semver.org/lang/nl/): `v1.2.1` voor een bugfix, `v1.3.0`
-voor een nieuwe functie. Elke maandag wordt de nieuwste versie opnieuw gebouwd voor updates van de
-base-image (handmatig: *Actions → Image → Run workflow*).
+The image is published to `ghcr.io/hjeverts/wolsels-backend` with the tags `1.2.0`, `1.2` and, if it is the
+newest version, `latest`. Use [semver](https://semver.org/): `v1.2.1` for a bug fix, `v1.3.0` for a new
+feature. Every Monday the newest version is rebuilt to pick up base image updates (manually:
+*Actions → Image → Run workflow*).
 
-Zelf bouwen:
+Building it yourself:
 
 ```sh
 docker build -t wolsels-backend .
 docker run -p 8080:8080 -v wolsels-data:/data wolsels-backend
 ```
 
-## Licentie
+## License
 
 Copyright (C) 2026 Hans Everts
 
-Dit programma is vrije software: je mag het verspreiden en/of aanpassen onder de voorwaarden van de
-[GNU Affero General Public License](LICENSE), versie 3. Bied je een aangepaste versie aan als
-webdienst, dan moet je de broncode van die versie ook beschikbaar stellen aan de gebruikers.
+This program is free software: you can redistribute it and/or modify it under the terms of the
+[GNU Affero General Public License](LICENSE), version 3. If you offer a modified version as a web service,
+you must also make the source code of that version available to its users.

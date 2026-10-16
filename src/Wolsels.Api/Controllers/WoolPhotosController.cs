@@ -8,8 +8,8 @@ using Wolsels.Api.Localization;
 namespace Wolsels.Api.Controllers;
 
 /// <summary>
-/// Foto's van een voorraadpartij. De browser verkleint ze vóór het uploaden; de server controleert dat het
-/// JPEG's van een beperkt formaat zijn.
+/// Photos of a stock lot. The browser resizes them before uploading; the server checks that they are
+/// JPEGs of limited size.
 /// </summary>
 [ApiController]
 [Route("api/wools/{woolId:int}/photos")]
@@ -18,12 +18,12 @@ public class WoolPhotosController(WolselsDbContext db, TimeProvider clock) : Con
     public const int MaxPhotosPerWool = 10;
 
     /// <summary>
-    /// Eén wijziging tegelijk aan het aantal foto's (uploaden, samenvoegen), zodat twee gelijktijdige verzoeken
-    /// niet allebei de laatste plek kunnen innemen. Er draait één backend; een slot in het proces volstaat.
+    /// One change at a time to the number of photos (upload, merge), so that two concurrent requests
+    /// cannot both take the last slot. There is a single backend; an in-process lock is enough.
     /// </summary>
     public static readonly SemaphoreSlim CountLock = new(1, 1);
 
-    /// <summary>Langste zijde van een foto; de frontend verkleint tot 1600 px, met wat ruimte.</summary>
+    /// <summary>Longest side of a photo; the frontend resizes to 1600 px, with some margin.</summary>
     public const int MaxPhotoSide = 2048;
     public const int MaxThumbnailSide = 512;
     public const int MaxPhotoBytes = 2 * 1024 * 1024;
@@ -57,10 +57,10 @@ public class WoolPhotosController(WolselsDbContext db, TimeProvider clock) : Con
     }
 
     /// <summary>
-    /// De foto, of met <c>?size=thumb</c> de miniatuur. De browser mag hem bewaren, maar moet bij elk gebruik
-    /// opnieuw vragen (no-cache): zo gaat ook een foto uit de cache langs de controle op account en huishouden,
-    /// bv. na uitloggen of inloggen als iemand anders. Een foto verandert nooit, dus de ETag is vast en het
-    /// antwoord is dan meestal een kleine 304.
+    /// The photo, or with <c>?size=thumb</c> the thumbnail. The browser may keep it, but must ask again on every
+    /// use (no-cache): that way a cached photo also passes the account and household check,
+    /// e.g. after logging out or logging in as someone else. A photo never changes, so the ETag is fixed and the
+    /// response is then usually a small 304.
     /// </summary>
     [HttpGet("{photoId:int}")]
     public async Task<IActionResult> Get(int woolId, int photoId, string? size, CancellationToken ct)

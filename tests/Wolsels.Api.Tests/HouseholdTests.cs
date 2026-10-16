@@ -49,12 +49,12 @@ public class HouseholdTests(WolselsFactory factory) : IClassFixture<WolselsFacto
         var partnerHouseholds = await partner.GetFromJsonAsync<List<HouseholdSummaryDto>>("/api/households", Json);
         Assert.Equal(2, partnerHouseholds!.Count);
 
-        // Standaard (zonder header) het eigen, eerste huishouden; met header het gedeelde.
+        // By default (without header) the user's own first household; with the header the shared one.
         Assert.Equal(["Eigen alpaca"], await WoolNamesAsync(partner));
         UseHousehold(partner, joined.HouseholdId);
         Assert.Equal(["Gedeelde merino"], await WoolNamesAsync(partner));
 
-        // Wat de partner toevoegt in het gedeelde huishouden, ziet hans ook.
+        // What the partner adds in the shared household, hans sees too.
         await AddWoolAsync(partner, "Samen gekocht");
         Assert.Contains("Samen gekocht", await WoolNamesAsync(hans));
         Assert.DoesNotContain("Eigen alpaca", await WoolNamesAsync(hans));
@@ -115,7 +115,7 @@ public class HouseholdTests(WolselsFactory factory) : IClassFixture<WolselsFacto
         var memberId = household!.Members.Single(m => !m.IsYou).UserId;
         Assert.Equal(HttpStatusCode.OK, (await owner.DeleteAsync($"/api/household/members/{memberId}")).StatusCode);
 
-        // Zelfde sessie, zelfde header: direct geweigerd.
+        // Same session, same header: rejected immediately.
         Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync("/api/wools")).StatusCode);
     }
 
@@ -130,7 +130,7 @@ public class HouseholdTests(WolselsFactory factory) : IClassFixture<WolselsFacto
         UseHousehold(member, joined.HouseholdId);
         Assert.Equal(HttpStatusCode.OK, (await member.PostAsync("/api/household/leave", null)).StatusCode);
 
-        // Het verlaten huishouden is niet meer toegankelijk; accountzaken en de lijst blijven werken.
+        // The household that was left is no longer accessible; account matters and the list keep working.
         Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync("/api/wools")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await member.GetAsync("/api/auth/me")).StatusCode);
         var remaining = await member.GetFromJsonAsync<List<HouseholdSummaryDto>>("/api/households", Json);

@@ -3,7 +3,7 @@ using Wolsels.Api.Localization;
 
 namespace Wolsels.Api.Auth;
 
-/// <summary>Meldingen van Identity in de taal van het verzoek.</summary>
+/// <summary>Identity messages in the language of the request.</summary>
 public class LocalizedIdentityErrorDescriber : IdentityErrorDescriber
 {
     public override IdentityError DuplicateEmail(string email) =>

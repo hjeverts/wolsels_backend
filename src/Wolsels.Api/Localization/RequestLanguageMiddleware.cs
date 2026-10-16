@@ -3,8 +3,8 @@ using Microsoft.Extensions.Localization;
 namespace Wolsels.Api.Localization;
 
 /// <summary>
-/// Kiest de taal van meldingen uit de Accept-Language-header (de frontend stuurt de taal van de app mee).
-/// De cultuur van het proces verandert niet: getallen en datums in de API zelf blijven cultuuronafhankelijk.
+/// Picks the language of messages from the Accept-Language header (the frontend sends the app language).
+/// The process culture does not change: numbers and dates in the API itself stay culture-invariant.
 /// </summary>
 public sealed class RequestLanguageMiddleware(RequestDelegate next)
 {
@@ -19,7 +19,7 @@ public sealed class RequestLanguageMiddleware(RequestDelegate next)
     }
 }
 
-/// <summary>Laat foutmeldingen van validatieattributen (ErrorMessage = sleutel) vertalen via <see cref="Texts"/>.</summary>
+/// <summary>Translates error messages of validation attributes (ErrorMessage = key) via <see cref="Texts"/>.</summary>
 public sealed class TextsStringLocalizer : IStringLocalizer
 {
     public LocalizedString this[string name] =>

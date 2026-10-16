@@ -1,9 +1,9 @@
-# Tests bij elke pull request en push naar main. Een Docker-image wordt alleen gebouwd voor een
-# versietag (v1.2.3) en komt op ghcr.io/<eigenaar>/wolsels-backend als 1.2.3. Daarna wijzen 1.2
-# en latest naar de nieuwste gepubliceerde versie.
+# Tests on every pull request and push to main. A Docker image is only built for a
+# version tag (v1.2.3) and is published to ghcr.io/<owner>/wolsels-backend as 1.2.3. After that 1.2
+# and latest point to the newest published version.
 #
-# Elke maandag (en handmatig via "Run workflow") wordt de nieuwste versie zonder cache opnieuw
-# gebouwd, zodat beveiligingsupdates van de base-image meekomen.
+# Every Monday (and manually via "Run workflow") the newest version is rebuilt without cache,
+# so that security updates of the base image are picked up.
 name: Image
 
 on:
@@ -15,7 +15,7 @@ on:
     - cron: "0 4 * * 1"
   workflow_dispatch:
 
-# Alleen bij pull requests een oudere run afbreken; een release of wekelijkse build loopt altijd af.
+# Only cancel an older run for pull requests; a release or weekly build always runs to completion.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -24,9 +24,9 @@ env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/wolsels-backend
 
 jobs:
-  # Bepaalt welke commit getest en eventueel gebouwd wordt, zodat tests en image altijd over
-  # dezelfde code gaan: bij een tag die tag, wekelijks/handmatig de nieuwste versietag, anders de
-  # commit van de push of pull request.
+  # Determines which commit is tested and possibly built, so that tests and image always cover
+  # the same code: for a tag that tag, weekly/manually the newest version tag, otherwise the
+  # commit of the push or pull request.
   resolve:
     runs-on: ubuntu-latest
     outputs:
@@ -43,7 +43,7 @@ jobs:
             push:tag) tag="$GITHUB_REF_NAME" ;;
             schedule:* | workflow_dispatch:*)
               tag=$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
-              [ -n "$tag" ] || echo "::notice::Nog geen versietag; maak er een met bv. git tag v1.0.0 && git push origin v1.0.0" ;;
+              [ -n "$tag" ] || echo "::notice::No version tag yet; create one with e.g. git tag v1.0.0 && git push origin v1.0.0" ;;
             *) tag="" ;;
           esac
           if [ -n "$tag" ]; then
@@ -67,7 +67,7 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet test Wolsels.slnx -c Release
 
-  # Pusht alleen de exacte versie; zo kan een build nooit een andere versie overschrijven.
+  # Only pushes the exact version; that way a build can never overwrite another version.
   image:
     needs: [resolve, test]
     if: needs.resolve.outputs.build == 'true'
@@ -104,9 +104,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Zet latest en <major>.<minor> op de nieuwste versie die echt op ghcr.io staat, bepaald op het
-  # moment zelf. Eén tegelijk; elke run rekent alles opnieuw uit, dus een overgeslagen run is geen
-  # probleem en een trage build van een oudere versie zet latest nooit terug.
+  # Points latest and <major>.<minor> at the newest version actually on ghcr.io, determined at the
+  # moment itself. One at a time; every run recalculates everything, so a skipped run is not a
+  # problem and a slow build of an older version never moves latest back.
   promote:
     needs: [resolve, image]
     runs-on: ubuntu-latest

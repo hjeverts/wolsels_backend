@@ -50,7 +50,7 @@ public class HouseholdController(
         return NoContent();
     }
 
-    /// <summary>Maakt een eenmalige uitnodigingslink; de token wordt alleen nu getoond.</summary>
+    /// <summary>Creates a single-use invitation link; the token is only shown now.</summary>
     [HttpPost("invites")]
     public Task<ActionResult<CreatedInviteDto>> CreateInvite(CancellationToken ct) => Handle(async () =>
     {
@@ -66,7 +66,7 @@ public class HouseholdController(
         return deleted == 0 ? NotFound() : NoContent();
     }
 
-    /// <summary>Gegevens van een uitnodiging, voor de uitnodigingspagina (ook zonder login).</summary>
+    /// <summary>Details of an invitation, for the invitation page (also without login).</summary>
     [AllowAnonymous]
     [HttpGet("invites/{token}")]
     public async Task<ActionResult<InviteInfoDto>> GetInvite(string token, CancellationToken ct) =>
@@ -74,7 +74,7 @@ public class HouseholdController(
             ? new InviteInfoDto(info.Household.Name, info.InvitedBy, info.Invite.ExpiresAt)
             : Problem(statusCode: StatusCodes.Status404NotFound, title: Texts.Get("Household.InviteInvalid"));
 
-    /// <summary>Wordt lid van het huishouden van de uitnodiging (naast je andere huishoudens).</summary>
+    /// <summary>Joins the household of the invitation (in addition to your other households).</summary>
     [HttpPost("join")]
     public Task<ActionResult<JoinedDto>> Join(JoinRequest request, CancellationToken ct) => Handle(async () =>
     {
@@ -82,7 +82,7 @@ public class HouseholdController(
         return new JoinedDto(household.Id, household.Name);
     });
 
-    /// <summary>Verlaat het actieve huishouden.</summary>
+    /// <summary>Leaves the active household.</summary>
     [HttpPost("leave")]
     public Task<ActionResult<object>> Leave(CancellationToken ct) => Handle<object>(async () =>
     {
@@ -110,7 +110,7 @@ public class HouseholdController(
     }
 }
 
-/// <summary>De huishoudens van de ingelogde gebruiker, los van het actieve huishouden.</summary>
+/// <summary>The households of the logged-in user, independent of the active household.</summary>
 [ApiController]
 [Route("api/households")]
 public class HouseholdsController(WolselsDbContext db, HouseholdService households, ICurrentUser currentUser) : ControllerBase
@@ -129,7 +129,7 @@ public class HouseholdsController(WolselsDbContext db, HouseholdService househol
             .ToListAsync(ct);
     }
 
-    /// <summary>Maakt een extra (leeg) huishouden aan met de gebruiker als enig lid.</summary>
+    /// <summary>Creates an additional (empty) household with the user as its only member.</summary>
     [HttpPost]
     public async Task<ActionResult<HouseholdSummaryDto>> Create(HouseholdRequest request, CancellationToken ct)
     {

@@ -24,7 +24,7 @@ public partial class LocalizationTests(WolselsFactory factory) : IClassFixture<W
             {
                 var expected = Placeholder().Matches(text).Select(m => m.Value).Order();
                 Assert.True(expected.SequenceEqual(Placeholder().Matches(texts[key]).Select(m => m.Value).Order()),
-                    $"{language}: {key} heeft andere parameters dan het Nederlands.");
+                    $"{language}: {key} has different parameters than the Dutch text.");
             }
         }
     }
@@ -32,7 +32,7 @@ public partial class LocalizationTests(WolselsFactory factory) : IClassFixture<W
     [Fact]
     public void EveryText_CanBeFormattedWithoutErrors()
     {
-        // Een losse { of } in een vertaling zou pas bij gebruik een FormatException (500) geven.
+        // A stray { or } in a translation would only cause a FormatException (500) when used.
         var args = Enumerable.Range(0, 5).Select(i => (object)(i + 0.5m)).ToArray();
         foreach (var language in Texts.Languages)
         foreach (var key in Texts.AllTexts[language].Keys)
@@ -119,7 +119,7 @@ public partial class LocalizationTests(WolselsFactory factory) : IClassFixture<W
         var english = await (await client.PostAsJsonAsync("/api/harvests", harvest)).Content.ReadAsStringAsync();
         Assert.Contains(Texts.GetFor("en", "Harvests.ChooseSource"), english);
 
-        // Ook meldingen van validatieattributen.
+        // Messages from validation attributes too.
         var wool = await client.PostAsJsonAsync("/api/wools",
             new { name = "Test", woolType = "Merino", color = "Wit", colorHex = "rood", weightGrams = 1 });
         Assert.Contains(Texts.GetFor("en", "Validation.ColorHex"), await wool.Content.ReadAsStringAsync());

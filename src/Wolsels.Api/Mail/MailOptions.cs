@@ -4,10 +4,10 @@ public class SmtpOptions
 {
     public const string SectionName = "Smtp";
 
-    /// <summary>Hostnaam van de mailserver. Leeg = geen mail, en dus geen "wachtwoord vergeten".</summary>
+    /// <summary>Host name of the mail server. Empty = no mail, and therefore no "forgot password".</summary>
     public string? Host { get; set; }
     public int Port { get; set; } = 587;
-    /// <summary>Auto, None, StartTls of SslOnConnect.</summary>
+    /// <summary>Auto, None, StartTls or SslOnConnect.</summary>
     public string Security { get; set; } = "Auto";
     public string? Username { get; set; }
     public string? Password { get; set; }
@@ -21,6 +21,6 @@ public class AppOptions
 {
     public const string SectionName = "App";
 
-    /// <summary>Openbare URL van Wolsels (bv. https://wol.example.nl), gebruikt voor links in e-mails.</summary>
+    /// <summary>Public URL of Wolsels (e.g. https://wol.example.nl), used for links in emails.</summary>
     public string? PublicUrl { get; set; }
 }

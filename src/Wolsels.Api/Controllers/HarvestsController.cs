@@ -39,7 +39,7 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
             ? HarvestDto.From(harvest)
             : NotFound();
 
-    /// <summary>Totale productie ruwe wol, per maand en per dier/locatie.</summary>
+    /// <summary>Total raw wool production, per month and per animal/location.</summary>
     [HttpGet("summary")]
     public async Task<ProductionSummaryDto> Summary([FromQuery] int? year, CancellationToken ct)
     {
@@ -86,7 +86,7 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
 
         if (harvest.Wool is { } wool)
         {
-            // Al in de voorraad: een gewijzigd gewicht verrekenen met de partij.
+            // Already in stock: settle a changed weight with the lot.
             wool.WeightGrams = Math.Max(0, wool.WeightGrams + harvest.WeightGrams - previousWeight);
             wool.UpdatedAt = now;
         }
@@ -100,7 +100,7 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
         return await LoadDtoAsync(id, ct);
     }
 
-    /// <param name="removeFromStock">Ook het gewicht van de oogst van de gekoppelde voorraadpartij afhalen.</param>
+    /// <param name="removeFromStock">Also subtract the harvest's weight from the linked stock lot.</param>
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, [FromQuery] bool removeFromStock, CancellationToken ct)
     {
@@ -116,12 +116,12 @@ public class HarvestsController(WolselsDbContext db, TimeProvider clock) : Contr
         return NoContent();
     }
 
-    /// <summary>Telt de oogst bij een bestaande partij op, of maakt een nieuwe partij.</summary>
+    /// <summary>Adds the harvest to an existing lot, or creates a new lot.</summary>
     private async Task<ActionResult?> AddToStockAsync(Harvest harvest, HarvestRequest request, DateTimeOffset now, CancellationToken ct)
     {
         if (request.StockWoolId is { } woolId)
         {
-            // Query filter: alleen partijen van het eigen huishouden.
+            // Query filter: only lots of the user's own household.
             if (await db.Wools.FirstOrDefaultAsync(w => w.Id == woolId, ct) is not { } wool)
             {
                 ModelState.AddModelError(nameof(request.StockWoolId), Texts.Get("Wools.NotFound"));

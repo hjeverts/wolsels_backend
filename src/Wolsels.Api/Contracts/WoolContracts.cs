@@ -14,7 +14,7 @@ public sealed record WoolDto(
     string? Notes,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    /// <summary>Foto's van deze partij, oudste eerst; op te halen via /api/wools/{id}/photos/{photoId}.</summary>
+    /// <summary>Photos of this lot, oldest first; fetched via /api/wools/{id}/photos/{photoId}.</summary>
     IReadOnlyList<int> PhotoIds)
 {
     public static WoolDto From(Wool w, IReadOnlyList<int> photoIds) => new(

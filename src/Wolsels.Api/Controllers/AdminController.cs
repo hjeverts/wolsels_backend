@@ -13,7 +13,7 @@ using Wolsels.Api.Localization;
 namespace Wolsels.Api.Controllers;
 
 /// <summary>
-/// Gebruikersbeheer voor beheerders. Bewust geen toegang tot de gegevens (wol, mengsels, ...) van huishoudens.
+/// User management for administrators. Deliberately no access to household data (wool, blends, ...).
 /// </summary>
 [ApiController]
 [Route("api/admin/users")]
@@ -62,7 +62,7 @@ public class AdminController(
         return NoContent();
     });
 
-    /// <summary>Schakelt 2FA uit en maakt de gekoppelde app ongeldig (telefoon én herstelcodes kwijt).</summary>
+    /// <summary>Turns off 2FA and invalidates the linked app (for a lost phone and lost recovery codes).</summary>
     [HttpPost("{id}/reset-2fa")]
     public Task<IActionResult> ResetTwoFactor(string id) => WithUser(id, async user =>
     {
@@ -72,7 +72,7 @@ public class AdminController(
         return NoContent();
     });
 
-    /// <summary>Herstellink om zelf te delen (werkt ook zonder mailserver); één dag geldig.</summary>
+    /// <summary>Reset link to share yourself (also works without a mail server); valid for one day.</summary>
     [HttpPost("{id}/password-reset")]
     public Task<IActionResult> PasswordReset(string id) => WithUser(id, async user =>
         Ok(new ResetLinkDto(await PasswordResetLinks.CreatePathAsync(users, user))));
@@ -91,7 +91,7 @@ public class AdminController(
         return NoContent();
     });
 
-    /// <summary>Wat er verdwijnt bij verwijderen: huishoudens waarvan dit account het enige lid is.</summary>
+    /// <summary>What disappears on deletion: households of which this account is the only member.</summary>
     [HttpGet("{id}/delete-preview")]
     public Task<IActionResult> DeletePreview(string id, CancellationToken ct) => WithUser(id, async user =>
         Ok(new DeletePreviewDto((await households.SoleHouseholdsAsync(user.Id, ct))

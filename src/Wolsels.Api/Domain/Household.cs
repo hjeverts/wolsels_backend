@@ -1,14 +1,14 @@
 namespace Wolsels.Api.Domain;
 
 /// <summary>
-/// Een huishouden deelt alle gegevens (wol, mengsels, dieren, ...). Meerdere logins (bv. partners) kunnen
-/// samen één huishouden vormen, en een gebruiker kan lid zijn van meerdere huishoudens.
+/// A household shares all data (wool, blends, animals, ...). Several logins (e.g. partners) can
+/// form one household together, and a user can be a member of several households.
 /// </summary>
 public class Household
 {
     public int Id { get; set; }
     public required string Name { get; set; }
-    /// <summary>Gebruiker die het huishouden heeft aangemaakt (ter informatie).</summary>
+    /// <summary>User who created the household (for information).</summary>
     public string? CreatedByUserId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
@@ -21,12 +21,12 @@ public class HouseholdMember
     public DateTimeOffset JoinedAt { get; set; }
 }
 
-/// <summary>Uitnodiging om lid te worden van een huishouden; eenmalig te gebruiken.</summary>
+/// <summary>Invitation to join a household; single use.</summary>
 public class HouseholdInvite
 {
     public int Id { get; set; }
     public int HouseholdId { get; set; }
-    /// <summary>SHA-256 van de token; de token zelf wordt niet opgeslagen.</summary>
+    /// <summary>SHA-256 of the token; the token itself is not stored.</summary>
     public required string TokenHash { get; set; }
     public required string CreatedByUserId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -35,16 +35,16 @@ public class HouseholdInvite
     public string? UsedByUserId { get; set; }
 }
 
-/// <summary>Gegevens die bij een huishouden horen; andere huishoudens zien ze nooit.</summary>
+/// <summary>Data belonging to a household; other households never see it.</summary>
 public interface IHouseholdData
 {
     int HouseholdId { get; set; }
 }
 
-/// <summary>Persoonlijke instellingen van een gebruiker (los van het huishouden).</summary>
+/// <summary>Personal settings of a user (independent of the household).</summary>
 public class UserSettings
 {
     public required string UserId { get; set; }
-    /// <summary>Taalcode van de app, zie <see cref="Localization.Texts.Languages"/>.</summary>
+    /// <summary>Language code of the app, see <see cref="Localization.Texts.Languages"/>.</summary>
     public required string Language { get; set; }
 }

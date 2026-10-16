@@ -46,8 +46,8 @@ public class WoolsController(WolselsDbContext db, TimeProvider clock) : Controll
     }
 
     /// <summary>
-    /// Voegt deze partij samen met een andere: het gewicht gaat over, en oogsten en mengsels die naar deze partij
-    /// verwijzen, verwijzen daarna naar de andere. Deze partij verdwijnt.
+    /// Merges this lot into another: the weight moves over, and harvests and blends that refer to this lot
+    /// refer to the other one afterwards. This lot disappears.
     /// </summary>
     [HttpPost("{id:int}/merge")]
     public async Task<ActionResult<WoolDto>> Merge(int id, MergeWoolRequest request, CancellationToken ct)
@@ -64,7 +64,7 @@ public class WoolsController(WolselsDbContext db, TimeProvider clock) : Controll
             return ValidationProblem(ModelState);
         }
 
-        // Samen niet meer dan het maximum aan foto's; het slot voorkomt dat een upload er tussendoor komt.
+        // Together no more than the maximum number of photos; the lock keeps an upload from slipping in between.
         await WoolPhotosController.CountLock.WaitAsync(ct);
         try
         {
@@ -96,7 +96,7 @@ public class WoolsController(WolselsDbContext db, TimeProvider clock) : Controll
     private async Task<WoolDto> ToDtoAsync(Wool wool, CancellationToken ct) =>
         WoolDto.From(wool, await db.WoolPhotos.Where(p => p.WoolId == wool.Id).OrderBy(p => p.Id).Select(p => p.Id).ToListAsync(ct));
 
-    /// <summary>Verwijdert de partij; de foto's worden door de database meeverwijderd.</summary>
+    /// <summary>Deletes the lot; the database deletes its photos along with it.</summary>
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
