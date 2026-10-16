@@ -122,7 +122,7 @@ public class AnimalsController(WolselsDbContext db, TimeProvider clock) : Contro
             animal.UpdatedAt = now;
 
             // Een bestaand dier houdt zijn diersoort als die in het bestand leeg is; diersoort is verplicht.
-            if (row.Species.NullIfEmpty() is { } species) animal.Species = species;
+            if ((isNew || request.Has("species")) && row.Species.NullIfEmpty() is { } species) animal.Species = species;
             if (isNew || request.Has("breed")) animal.Breed = row.Breed.NullIfEmpty();
             if (isNew || request.Has("color")) animal.Color = row.Color.NullIfEmpty();
             if (isNew || request.Has("birthDate")) animal.BirthDate = row.BirthDate;
