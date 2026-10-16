@@ -1,8 +1,9 @@
-# Test en bouw de Docker-image en zet hem op ghcr.io/<eigenaar>/wolsels-backend.
+# Tests bij elke pull request en push naar main. Een Docker-image wordt alleen gebouwd voor een
+# versietag (v1.2.3) en komt op ghcr.io/<eigenaar>/wolsels-backend als 1.2.3. Daarna wijzen 1.2
+# en latest naar de nieuwste gepubliceerde versie.
 #
-# Tags: latest (main), sha-<commit> (om terug te kunnen naar een eerdere versie) en bij een git-tag
-# v1.2.3 ook 1.2.3 en 1.2. Elke maandag wordt de image zonder cache opnieuw gebouwd, zodat
-# beveiligingsupdates van de base-image meekomen.
+# Elke maandag (en handmatig via "Run workflow") wordt de nieuwste versie zonder cache opnieuw
+# gebouwd, zodat beveiligingsupdates van de base-image meekomen.
 name: Image
 
 on:
@@ -14,29 +15,70 @@ on:
     - cron: "0 4 * * 1"
   workflow_dispatch:
 
+# Alleen bij pull requests een oudere run afbreken; een release of wekelijkse build loopt altijd af.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/wolsels-backend
 
 jobs:
+  # Bepaalt welke commit getest en eventueel gebouwd wordt, zodat tests en image altijd over
+  # dezelfde code gaan: bij een tag die tag, wekelijks/handmatig de nieuwste versietag, anders de
+  # commit van de push of pull request.
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.target.outputs.build }}
+      sha: ${{ steps.target.outputs.sha }}
+      version: ${{ steps.target.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: target
+        run: |
+          case "$GITHUB_EVENT_NAME:$GITHUB_REF_TYPE" in
+            push:tag) tag="$GITHUB_REF_NAME" ;;
+            schedule:* | workflow_dispatch:*)
+              tag=$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+              [ -n "$tag" ] || echo "::notice::Nog geen versietag; maak er een met bv. git tag v1.0.0 && git push origin v1.0.0" ;;
+            *) tag="" ;;
+          esac
+          if [ -n "$tag" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "sha=$(git rev-list -n 1 "$tag")" >> "$GITHUB_OUTPUT"
+            echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: resolve
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
       - run: dotnet test Wolsels.slnx -c Release
 
+  # Pusht alleen de exacte versie; zo kan een build nooit een andere versie overschrijven.
   image:
-    needs: test
-    if: github.event_name != 'pull_request'
+    needs: [resolve, test]
+    if: needs.resolve.outputs.build == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -46,18 +88,59 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/wolsels-backend
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=short
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+          images: ${{ env.IMAGE }}
+          tags: type=raw,value=${{ needs.resolve.outputs.version }}
+          flavor: latest=false
+          labels: |
+            org.opencontainers.image.version=${{ needs.resolve.outputs.version }}
+            org.opencontainers.image.revision=${{ needs.resolve.outputs.sha }}
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          no-cache: ${{ github.event_name == 'schedule' }}
+          no-cache: ${{ github.event_name != 'push' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Zet latest en <major>.<minor> op de nieuwste versie die echt op ghcr.io staat, bepaald op het
+  # moment zelf. Eén tegelijk; elke run rekent alles opnieuw uit, dus een overgeslagen run is geen
+  # probleem en een trage build van een oudere versie zet latest nooit terug.
+  promote:
+    needs: [resolve, image]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-promote
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          git fetch -q --tags --force origin
+          versions=$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -rV || true)
+          published() { docker buildx imagetools inspect "$IMAGE:$1" >/dev/null 2>&1; }
+          point() {
+            for v in $2; do
+              if published "$v"; then
+                echo "$IMAGE:$1 -> $v"
+                docker buildx imagetools create -t "$IMAGE:$1" "$IMAGE:$v"
+                return
+              fi
+            done
+          }
+          point latest "$versions"
+          minor=$(echo "$VERSION" | cut -d. -f1,2)
+          point "$minor" "$(echo "$versions" | awk -F. -v m="$minor" '$1 "." $2 == m')"
