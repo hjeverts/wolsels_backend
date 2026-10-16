@@ -4,6 +4,6 @@ public class BlendOptions
 {
     public const string SectionName = "Blends";
 
-    /// <summary>Maximaal aantal soorten wol in één mengsel.</summary>
+    /// <summary>Maximum number of wools in one blend.</summary>
     public int MaxComponents { get; set; } = 6;
 }

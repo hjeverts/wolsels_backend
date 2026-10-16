@@ -16,17 +16,17 @@ public class HouseholdException(int statusCode, string message) : Exception(mess
 
 public sealed record InviteInfo(HouseholdInvite Invite, Household Household, string InvitedBy);
 
-/// <summary>Beheer van huishoudens: lidmaatschap, uitnodigingen, toetreden en verlaten.</summary>
+/// <summary>Household management: membership, invitations, joining and leaving.</summary>
 public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> users, TimeProvider clock)
 {
     public static readonly TimeSpan InviteLifetime = TimeSpan.FromDays(7);
     public const int MaxOpenInvites = 10;
 
     /// <summary>
-    /// Bepaalt het actieve huishouden: het gevraagde (als de gebruiker er lid van is), anders het eerste
-    /// huishouden van de gebruiker. Een gebruiker zonder huishouden krijgt er een.
+    /// Determines the active household: the requested one (if the user is a member), otherwise the user's
+    /// first household. A user without a household gets one.
     /// </summary>
-    /// <returns>null als het gevraagde huishouden niet van deze gebruiker is.</returns>
+    /// <returns>null if the requested household does not belong to this user.</returns>
     public async Task<int?> ResolveHouseholdAsync(string userId, int? requestedHouseholdId, CancellationToken ct = default)
     {
         if (requestedHouseholdId is { } requested)
@@ -56,7 +56,7 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
         db.HouseholdMembers.Add(new HouseholdMember { UserId = userId, Household = household, JoinedAt = now });
         await db.SaveChangesAsync(ct);
 
-        // Gegevens van vóór de invoering van accounts (zonder huishouden) gaan naar het allereerste huishouden.
+        // Data from before accounts were introduced (without a household) goes to the very first household.
         if (await db.Households.CountAsync(ct) == 1)
         {
             await db.Wools.IgnoreQueryFilters().Where(e => e.HouseholdId == 0).ExecuteUpdateAsync(s => s.SetProperty(e => e.HouseholdId, household.Id), ct);
@@ -90,7 +90,7 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
         return (token, invite);
     }
 
-    /// <summary>Zoekt een geldige (niet verlopen, niet gebruikte) uitnodiging op.</summary>
+    /// <summary>Looks up a valid (not expired, not used) invitation.</summary>
     public async Task<InviteInfo?> FindValidInviteAsync(string? token, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token) || token.Length > 100) return null;
@@ -103,7 +103,7 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
         return new InviteInfo(invite, household, inviter?.Email ?? Texts.Get("Household.SomeMember"));
     }
 
-    /// <summary>Voegt de gebruiker toe aan het huishouden van de uitnodiging (naast zijn andere huishoudens).</summary>
+    /// <summary>Adds the user to the household of the invitation (in addition to their other households).</summary>
     public async Task<Household> JoinAsync(string userId, string token, CancellationToken ct)
     {
         var info = await FindValidInviteAsync(token, ct)
@@ -120,8 +120,8 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
     }
 
     /// <summary>
-    /// De gebruiker verlaat een huishouden. Het laatste lid kan niet vertrekken, zodat er nooit gegevens zonder
-    /// eigenaar achterblijven. Wie geen huishouden meer heeft, krijgt een nieuw, leeg huishouden.
+    /// The user leaves a household. The last member cannot leave, so that data is never left without
+    /// an owner. Whoever has no household left gets a new, empty household.
     /// </summary>
     public async Task LeaveAsync(string userId, int householdId, CancellationToken ct)
     {
@@ -129,7 +129,7 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
             Texts.Get("Household.LastMember"), ct);
     }
 
-    /// <summary>Verwijdert een ander lid uit het huishouden.</summary>
+    /// <summary>Removes another member from the household.</summary>
     public async Task RemoveMemberAsync(int householdId, string userId, string memberUserId, CancellationToken ct)
     {
         if (memberUserId == userId)
@@ -149,11 +149,11 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
             await CreateHouseholdAsync(userId, null, ct);
     }
 
-    /// <summary>Verwijdert een huishouden met al zijn gegevens (bij het verwijderen van het laatste lid).</summary>
+    /// <summary>Deletes a household with all its data (when deleting the last member).</summary>
     public async Task DeleteHouseholdAsync(int householdId, CancellationToken ct)
     {
-        // Volgorde i.v.m. verwijzingen: oogsten -> mengsels (componenten via cascade) -> dieren -> locaties -> wol
-        // (foto's via cascade).
+        // Order because of references: harvests -> blends (components via cascade) -> animals -> locations -> wool
+        // (photos via cascade).
         await db.Harvests.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);
         await db.Blends.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);
         await db.Animals.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);
@@ -162,7 +162,7 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
         await db.Households.Where(h => h.Id == householdId).ExecuteDeleteAsync(ct);
     }
 
-    /// <summary>Huishoudens waarvan de gebruiker het enige lid is, met het aantal gegevens erin.</summary>
+    /// <summary>Households of which the user is the only member, with the number of items in them.</summary>
     public async Task<List<(Household Household, int Items)>> SoleHouseholdsAsync(string userId, CancellationToken ct)
     {
         var ids = await db.HouseholdMembers.Where(m => m.UserId == userId)

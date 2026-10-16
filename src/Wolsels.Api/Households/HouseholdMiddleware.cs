@@ -6,10 +6,10 @@ using Wolsels.Api.Localization;
 namespace Wolsels.Api.Households;
 
 /// <summary>
-/// Bepaalt per verzoek het actieve huishouden. De frontend stuurt per tabblad mee welk huishouden hij toont
-/// (header <c>X-Household</c>); de server controleert bij elk verzoek of de gebruiker daar lid van is.
-/// Bewust niet in de sessiecookie: wie uit een huishouden wordt verwijderd, verliest direct de toegang, en
-/// een tabblad met een ander huishouden kan nooit per ongeluk in het verkeerde huishouden opslaan.
+/// Determines the active household per request. The frontend sends, per tab, which household it shows
+/// (header <c>X-Household</c>); the server checks on every request that the user is a member of it.
+/// Deliberately not in the session cookie: whoever is removed from a household loses access immediately, and
+/// a tab showing another household can never accidentally save into the wrong household.
 /// </summary>
 public class HouseholdMiddleware(RequestDelegate next)
 {
@@ -21,7 +21,7 @@ public class HouseholdMiddleware(RequestDelegate next)
     {
         if (currentUser is HttpCurrentUser user && user.UserId is { } userId)
         {
-            // Verwijderde of door een beheerder geblokkeerde accounts verliezen direct hun sessie.
+            // Deleted accounts, or accounts blocked by an administrator, lose their session immediately.
             var account = await users.FindByIdAsync(userId);
             if (account is null || AccountBlocking.IsBlocked(account))
             {
@@ -31,7 +31,7 @@ public class HouseholdMiddleware(RequestDelegate next)
                 return;
             }
 
-            // Accountzaken en de lijst met eigen huishoudens hangen niet af van het actieve huishouden.
+            // Account matters and the list of one's own households don't depend on the active household.
             var path = context.Request.Path;
             if (path.StartsWithSegments("/api/auth"))
             {
@@ -61,8 +61,8 @@ public class HouseholdMiddleware(RequestDelegate next)
     }
 
     /// <summary>
-    /// Het gevraagde huishouden uit de header, of bij GET uit <c>?household=</c>: een &lt;img&gt; kan geen header
-    /// meesturen. Alleen lezen, en het lidmaatschap wordt op dezelfde manier gecontroleerd.
+    /// The requested household from the header, or for GET from <c>?household=</c>: an &lt;img&gt; cannot send a
+    /// header. Read-only, and membership is checked the same way.
     /// </summary>
     private static bool TryGetRequested(HttpRequest request, out string? value)
     {

@@ -62,7 +62,7 @@ public class HarvestStockTests(WolselsFactory factory) : IClassFixture<WolselsFa
         Assert.Equal(batch.WoolId, (await added.Content.ReadFromJsonAsync<HarvestDto>(TestJson.Options))!.WoolId);
         Assert.Equal(90m, await StockAsync(batch.WoolId!.Value));
 
-        // Gewicht corrigeren: het verschil gaat mee naar de partij (en niet nog eens volledig erbij).
+        // Correcting the weight: the difference goes to the lot (and the full weight is not added again).
         await _client.PutAsJsonAsync($"/api/harvests/{later.Id}",
             new { date = "2030-03-01", animalId = animal, weightGrams = 45, addToStock = true, stockWoolId = batch.WoolId }, TestJson.Options);
         Assert.Equal(95m, await StockAsync(batch.WoolId.Value));

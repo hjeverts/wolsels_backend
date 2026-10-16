@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Identity;
 namespace Wolsels.Api.Admin;
 
 /// <summary>
-/// Blokkeren door een beheerder gebruikt de lockout van Identity met een einddatum ver in de toekomst. Zo kan
-/// een geblokkeerd account niet inloggen, en is het te onderscheiden van een tijdelijke lockout na foute pogingen.
+/// Blocking by an administrator uses Identity's lockout with an end date far in the future. That way
+/// a blocked account cannot log in, and it can be told apart from a temporary lockout after failed attempts.
 /// </summary>
 public static class AccountBlocking
 {

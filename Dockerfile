@@ -6,7 +6,7 @@ COPY src/ src/
 RUN dotnet publish src/Wolsels.Api/Wolsels.Api.csproj -c Release -o /app --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
-# Beveiligingsupdates van Ubuntu meenemen (opnieuw bouwen met ./scripts/update.sh --force).
+# Pick up Ubuntu security updates (rebuild with ./scripts/update.sh --force).
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app .
@@ -16,7 +16,7 @@ RUN mkdir -p /data && chown $APP_UID /data
 VOLUME /data
 USER $APP_UID
 EXPOSE 8080
-# Het aspnet-image heeft geen curl/wget; bash kan zelf een HTTP-request doen.
+# The aspnet image has no curl/wget; bash can make an HTTP request itself.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q Healthy <&3"]
 ENTRYPOINT ["dotnet", "Wolsels.Api.dll"]

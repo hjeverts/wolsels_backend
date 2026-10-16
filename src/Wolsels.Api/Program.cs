@@ -17,7 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddLocalization();
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
-    // ErrorMessage van validatieattributen is een sleutel in Localization/Texts.
+    // ErrorMessage of validation attributes is a key in Localization/Texts.
     .AddDataAnnotationsLocalization(o => o.DataAnnotationLocalizerProvider = (_, _) => new TextsStringLocalizer());
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
@@ -29,7 +29,7 @@ builder.Services.AddScoped<HouseholdService>();
 builder.Services.AddDbContext<WolselsDbContext>(o =>
     o.UseSqlite(builder.Configuration.GetConnectionString("Wolsels")));
 
-// --- Authenticatie ---
+// --- Authentication ---
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 var authOptions = builder.Configuration.GetSection(AuthOptions.SectionName).Get<AuthOptions>() ?? new AuthOptions();
 builder.Services.AddAuthorization();
@@ -38,7 +38,7 @@ builder.Services
     .AddIdentityApiEndpoints<IdentityUser>(o =>
     {
         o.User.RequireUniqueEmail = true;
-        // Lengte boven complexiteit: een lange wachtzin is sterker dan "Welkom01!".
+        // Length over complexity: a long passphrase is stronger than "Welcome01!".
         o.Password.RequiredLength = 10;
         o.Password.RequireDigit = false;
         o.Password.RequireLowercase = false;
@@ -60,13 +60,13 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.ExpireTimeSpan = TimeSpan.FromDays(14);
     o.SlidingExpiration = true;
 });
-// Sleutels voor de sessiecookies bewaren, anders is iedereen na een herstart uitgelogd.
+// Persist the session cookie keys, otherwise everyone is logged out after a restart.
 builder.Services.AddDataProtection()
     .SetApplicationName("Wolsels")
     .PersistKeysToFileSystem(new DirectoryInfo(builder.Configuration["DataProtection:KeysPath"] ?? "data/keys"));
 
-// Achter nginx: client-IP en https van de proxy overnemen. De backend is alleen bereikbaar via de
-// frontend-container, die het echte client-IP bepaalt en als enige X-Forwarded-For-waarde doorgeeft.
+// Behind nginx: take the client IP and https from the proxy. The backend is only reachable through the
+// frontend container, which determines the real client IP and passes it as the only X-Forwarded-For value.
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;

@@ -9,7 +9,7 @@ namespace Wolsels.Api.Data;
 public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurrentUser? currentUser = null)
     : IdentityDbContext<IdentityUser>(options)
 {
-    /// <summary>Wordt per request geëvalueerd in de query filters hieronder.</summary>
+    /// <summary>Evaluated per request in the query filters below.</summary>
     private int? CurrentHouseholdId => currentUser?.HouseholdId;
 
     public DbSet<Wool> Wools => Set<Wool>();
@@ -26,7 +26,7 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
-        // SQLite kent geen decimal: als REAL opslaan zodat sorteren en filteren in SQL blijft werken.
+        // SQLite has no decimal: store as REAL so that sorting and filtering in SQL keep working.
         configurationBuilder.Properties<decimal>().HaveConversion<double>();
         configurationBuilder.Properties<DateTimeOffset>().HaveConversion<string>();
         configurationBuilder.Properties<DateOnly>().HaveConversion<string>();
@@ -36,14 +36,14 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
     {
         base.OnModelCreating(modelBuilder);
 
-        // Elk huishouden ziet alleen zijn eigen gegevens.
+        // Each household only sees its own data.
         modelBuilder.Entity<Wool>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
         modelBuilder.Entity<WoolPhoto>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
         modelBuilder.Entity<Blend>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
         modelBuilder.Entity<Location>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
         modelBuilder.Entity<Animal>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
         modelBuilder.Entity<Harvest>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
-        // Componenten zijn alleen bereikbaar via hun (gefilterde) mengsel.
+        // Components are only reachable through their (filtered) blend.
         modelBuilder.Entity<BlendComponent>()
             .HasQueryFilter(c => Blends.Any(b => b.Id == c.BlendId));
 
@@ -90,7 +90,7 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
             e.Property(w => w.Origin).HasMaxLength(200);
             e.Property(w => w.Notes).HasMaxLength(4000);
         });
-        // Foto's verdwijnen met hun partij, ook bij ExecuteDelete (samenvoegen, huishouden verwijderen).
+        // Photos disappear with their lot, also with ExecuteDelete (merging, deleting a household).
         modelBuilder.Entity<WoolPhoto>(e =>
         {
             e.HasOne<Wool>().WithMany().HasForeignKey(p => p.WoolId).OnDelete(DeleteBehavior.Cascade);
@@ -118,7 +118,7 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
 
         modelBuilder.Entity<BlendComponent>(e =>
         {
-            // Wol die in een mengsel gebruikt wordt kan niet verwijderd worden.
+            // Wool used in a blend cannot be deleted.
             e.HasOne(c => c.Wool)
                 .WithMany()
                 .HasForeignKey(c => c.WoolId)
@@ -151,7 +151,7 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
             e.Property(h => h.Grade).HasMaxLength(100);
             e.Property(h => h.Notes).HasMaxLength(4000);
             e.HasIndex(h => h.Date);
-            // Dieren en locaties met oogsten kunnen niet verwijderd worden (zet een dier op inactief).
+            // Animals and locations with harvests cannot be deleted (set an animal to inactive).
             e.HasOne(h => h.Animal).WithMany().HasForeignKey(h => h.AnimalId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(h => h.Location).WithMany().HasForeignKey(h => h.LocationId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(h => h.Wool).WithMany().HasForeignKey(h => h.WoolId).OnDelete(DeleteBehavior.SetNull);
@@ -173,13 +173,13 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
-    /// <summary>Nieuwe gegevens horen automatisch bij het huishouden van de ingelogde gebruiker.</summary>
+    /// <summary>New data automatically belongs to the household of the logged-in user.</summary>
     private void AssignOwner()
     {
         foreach (var entry in ChangeTracker.Entries<IHouseholdData>().Where(e => e.State == EntityState.Added && e.Entity.HouseholdId == 0))
         {
             entry.Entity.HouseholdId = CurrentHouseholdId
-                ?? throw new InvalidOperationException("Opslaan van gegevens vereist een ingelogde gebruiker met een huishouden.");
+                ?? throw new InvalidOperationException("Saving data requires a logged-in user with a household.");
         }
     }
 }

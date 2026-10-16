@@ -6,20 +6,20 @@ using Wolsels.Api.Localization;
 namespace Wolsels.Api.Contracts;
 
 /// <summary>
-/// Dieren importeren, bv. uit een CSV-bestand dat de frontend heeft ingelezen. Dieren worden op naam
-/// gekoppeld aan bestaande dieren; die worden overgeslagen of (met <see cref="UpdateExisting"/>) bijgewerkt.
+/// Import animals, e.g. from a CSV file read by the frontend. Animals are matched by name
+/// to existing animals; those are skipped or (with <see cref="UpdateExisting"/>) updated.
 /// </summary>
 public sealed class AnimalImportRequest : IValidatableObject
 {
     public const int MaxRows = 1000;
 
-    /// <summary>Velden die in het bestand staan. Bij bijwerken blijven de andere velden ongewijzigd.</summary>
+    /// <summary>Fields present in the file. When updating, the other fields stay unchanged.</summary>
     public static readonly string[] KnownFields = ["species", "breed", "color", "birthDate", "location", "active", "notes"];
 
     public List<AnimalImportRow> Rows { get; set; } = [];
     public List<string> Fields { get; set; } = [];
     public bool UpdateExisting { get; set; }
-    /// <summary>Diersoort voor nieuwe dieren waarvan de diersoort in het bestand leeg is.</summary>
+    /// <summary>Species for new animals whose species is empty in the file.</summary>
     public string? DefaultSpecies { get; set; }
 
     public bool Has(string field) => Fields.Contains(field, StringComparer.OrdinalIgnoreCase);
@@ -64,20 +64,20 @@ public sealed class AnimalImportRequest : IValidatableObject
 
 public sealed class AnimalImportRow
 {
-    /// <summary>Regelnummer in het bestand, voor foutmeldingen.</summary>
+    /// <summary>Line number in the file, for error messages.</summary>
     public int? Line { get; set; }
     public string Name { get; set; } = "";
     public string? Species { get; set; }
     public string? Breed { get; set; }
     public string? Color { get; set; }
     /// <summary>
-    /// Als tekst (jjjj-mm-dd), zodat een ongeldige datum een fout met het regelnummer geeft in plaats van
-    /// een fout bij het inlezen van de JSON.
+    /// As text (yyyy-mm-dd), so that an invalid date gives an error with the line number instead of
+    /// an error while reading the JSON.
     /// </summary>
     public string? BirthDate { get; set; }
-    /// <summary>Naam van de locatie; een onbekende locatie wordt aangemaakt.</summary>
+    /// <summary>Name of the location; an unknown location is created.</summary>
     public string? Location { get; set; }
-    /// <summary>Leeg: een nieuw dier is actief, een bestaand dier blijft ongewijzigd.</summary>
+    /// <summary>Empty: a new animal is active, an existing animal stays unchanged.</summary>
     public bool? Active { get; set; }
     public string? Notes { get; set; }
 

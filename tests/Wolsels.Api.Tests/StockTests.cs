@@ -41,7 +41,7 @@ public class StockTests(WolselsFactory factory) : IClassFixture<WolselsFactory>
         Assert.Equal(350m, await StockAsync(a));
         Assert.Equal(150m, await StockAsync(b));
 
-        // Gewicht aanpassen terwijl gesponnen: verschil wordt verrekend.
+        // Changing the weight while spun: the difference is settled.
         await _client.PutAsJsonAsync($"/api/blends/{blend.Id}", Blend("Spun", a, b, 100), TestJson.Options);
         Assert.Equal(425m, await StockAsync(a));
         Assert.Equal(175m, await StockAsync(b));

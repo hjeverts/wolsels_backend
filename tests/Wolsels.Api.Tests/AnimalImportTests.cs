@@ -79,7 +79,7 @@ public class AnimalImportTests(WolselsFactory factory) : IClassFixture<WolselsFa
         var snuf = (await AnimalsAsync(client)).Single(a => a.Name == "Snuf");
         Assert.Equal("Zwart", snuf.Color);
         Assert.False(snuf.Active);
-        // Niet in het bestand: ongewijzigd.
+        // Not in the file: unchanged.
         Assert.Equal("Franse angora", snuf.Breed);
         Assert.Equal("Hok 1", snuf.LocationName);
     }
@@ -132,7 +132,7 @@ public class AnimalImportTests(WolselsFactory factory) : IClassFixture<WolselsFa
         Assert.Empty(await AnimalsAsync(client));
         Assert.Empty((await client.GetFromJsonAsync<List<LocationDto>>("/api/locations", TestJson.Options))!);
 
-        // Diersoort wordt pas gecontroleerd als de basiscontrole (naam, lengtes) klopt.
+        // Species is only checked once the basic validation (name, lengths) passes.
         var noSpecies = await client.PostAsJsonAsync("/api/animals/import", new
         {
             rows = new object[] { new { line = 4, name = "Zonder soort", species = "" } },

@@ -1,17 +1,17 @@
 namespace Wolsels.Api.Domain;
 
-/// <summary>Een partij wol op voorraad.</summary>
+/// <summary>A lot of wool in stock.</summary>
 public class Wool : IHouseholdData
 {
     public int Id { get; set; }
     public int HouseholdId { get; set; }
     public required string Name { get; set; }
-    /// <summary>Wolsoort, bv. Merino, Shetland, Alpaca.</summary>
+    /// <summary>Wool type, e.g. Merino, Shetland, Alpaca.</summary>
     public required string WoolType { get; set; }
     public required string Color { get; set; }
-    /// <summary>Optionele kleurcode (#rrggbb) voor weergave.</summary>
+    /// <summary>Optional colour code (#rrggbb) for display.</summary>
     public string? ColorHex { get; set; }
-    /// <summary>Huidig gewicht op voorraad in gram.</summary>
+    /// <summary>Current weight in stock in grams.</summary>
     public decimal WeightGrams { get; set; }
     public string? Origin { get; set; }
     public string? Notes { get; set; }
@@ -20,9 +20,9 @@ public class Wool : IHouseholdData
 }
 
 /// <summary>
-/// Een foto van een partij wol. De browser verkleint de foto vóór het uploaden; de server bewaart een
-/// JPEG (<see cref="Data"/>) en een kleine versie voor lijsten (<see cref="Thumbnail"/>). Wordt samen met de
-/// partij verwijderd.
+/// A photo of a lot of wool. The browser resizes the photo before uploading; the server stores a
+/// JPEG (<see cref="Data"/>) and a small version for lists (<see cref="Thumbnail"/>). Deleted together with the
+/// lot.
 /// </summary>
 public class WoolPhoto : IHouseholdData
 {

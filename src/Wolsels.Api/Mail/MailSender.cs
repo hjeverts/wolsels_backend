@@ -19,7 +19,7 @@ public class SmtpMailSender(IOptions<SmtpOptions> options, ILogger<SmtpMailSende
 
     public async Task SendAsync(string to, string subject, string text, string html, CancellationToken ct = default)
     {
-        if (!IsConfigured) throw new InvalidOperationException("Er is geen mailserver geconfigureerd.");
+        if (!IsConfigured) throw new InvalidOperationException("No mail server has been configured.");
 
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(_options.FromName, _options.From!));
@@ -41,6 +41,6 @@ public class SmtpMailSender(IOptions<SmtpOptions> options, ILogger<SmtpMailSende
             await client.AuthenticateAsync(_options.Username, _options.Password ?? "", ct);
         await client.SendAsync(message, ct);
         await client.DisconnectAsync(true, ct);
-        logger.LogInformation("E-mail '{Subject}' verstuurd", subject);
+        logger.LogInformation("Email '{Subject}' sent", subject);
     }
 }

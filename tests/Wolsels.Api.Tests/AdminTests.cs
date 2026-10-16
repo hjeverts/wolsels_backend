@@ -14,7 +14,7 @@ public class AdminTests(AdminFactory factory) : IClassFixture<AdminFactory>
     private static readonly SemaphoreSlim Setup = new(1, 1);
     private static HttpClient? _admin;
 
-    /// <summary>Het allereerste account van deze testinstantie (en dus beheerder).</summary>
+    /// <summary>The very first account of this test instance (and therefore administrator).</summary>
     private async Task<HttpClient> AdminAsync()
     {
         await Setup.WaitAsync();
@@ -101,7 +101,7 @@ public class AdminTests(AdminFactory factory) : IClassFixture<AdminFactory>
         Assert.Equal(HttpStatusCode.Conflict, demote.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.DeleteAsync($"/api/admin/users/{me.Id}")).StatusCode);
 
-        // Een tweede beheerder maken en weer intrekken kan wel; het intrekken werkt direct.
+        // Making a second administrator and revoking it again is fine; revoking takes effect immediately.
         var email = $"{Guid.NewGuid():N}@example.nl";
         var other = await factory.CreateUserClientAsync(email);
         var target = await FindAsync(admin, email);
@@ -120,7 +120,7 @@ public class AdminTests(AdminFactory factory) : IClassFixture<AdminFactory>
         var partner = await factory.CreateUserClientAsync();
 
         await leaving.PostAsJsonAsync("/api/wools", new { name = "Alleen van mij", woolType = "M", color = "W", weightGrams = 1 }, Json);
-        // Gedeeld huishouden: van de partner, met de vertrekkende gebruiker als lid.
+        // Shared household: the partner's, with the departing user as a member.
         await partner.PostAsJsonAsync("/api/wools", new { name = "Gedeeld", woolType = "M", color = "W", weightGrams = 1 }, Json);
         var token = (await (await partner.PostAsync("/api/household/invites", null)).Content.ReadFromJsonAsync<CreatedInviteDto>(Json))!.Token;
         await leaving.PostAsJsonAsync("/api/household/join", new { token }, Json);

@@ -21,10 +21,10 @@ public class BlendCalculationException(string field, string message) : Exception
 }
 
 /// <summary>
-/// Rekent een mengverhouding om naar gewichten. De verhouding mag in delen (3:2) of procenten (60:40)
-/// worden opgegeven; hij wordt altijd genormaliseerd. Gewichten worden afgerond op 0,1 gram.
+/// Converts a blend ratio to weights. The ratio may be given in parts (3:2) or percentages (60:40);
+/// it is always normalised. Weights are rounded to 0.1 gram.
 /// </summary>
-/// <remarks>De frontend bevat een identieke implementatie voor directe feedback tijdens het invullen.</remarks>
+/// <remarks>The frontend contains an identical implementation for immediate feedback while typing.</remarks>
 public class BlendCalculator(int maxComponents)
 {
     private const int TenthsPerGram = 10;
@@ -56,7 +56,7 @@ public class BlendCalculator(int maxComponents)
         if (totalWeight is not > 0)
             throw new BlendCalculationException("totalWeightGrams", Texts.Get("Calc.TotalPositive"));
 
-        // Grootste-restmethode: verdeel het totaal in tienden van een gram zodat de som exact klopt.
+        // Largest remainder method: distribute the total in tenths of a gram so that the sum is exact.
         var totalTenths = (long)Math.Round(totalWeight.Value * TenthsPerGram, MidpointRounding.AwayFromZero);
         var exact = ratios.Select(r => totalTenths * r / ratioSum).ToList();
         var tenths = exact.Select(e => (long)Math.Floor(e)).ToArray();

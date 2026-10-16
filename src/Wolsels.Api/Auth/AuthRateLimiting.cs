@@ -5,13 +5,13 @@ using Wolsels.Api.Localization;
 namespace Wolsels.Api.Auth;
 
 /// <summary>
-/// Beperkt het aantal pogingen per IP-adres op gevoelige endpoints, bovenop de blokkering per account.
+/// Limits the number of attempts per IP address on sensitive endpoints, on top of the per-account lockout.
 /// </summary>
 public static class AuthRateLimiting
 {
     public const string PasswordResetPolicy = "password-reset";
 
-    /// <summary>Endpoints waar wachtwoorden, codes of mails mee gemoeid zijn.</summary>
+    /// <summary>Endpoints involving passwords, codes or mails.</summary>
     private static readonly string[] SensitivePaths =
     [
         "/api/auth/login", "/api/auth/register", "/api/auth/password", "/api/auth/manage/2fa", "/api/auth/manage/info",
@@ -34,7 +34,7 @@ public static class AuthRateLimiting
                 }, ct);
             };
 
-            // Per minuut én per uur, zodat ook langzaam en volhardend raden begrensd is.
+            // Per minute and per hour, so that slow, persistent guessing is limited too.
             o.GlobalLimiter = PartitionedRateLimiter.CreateChained(
                 Limiter(options.RateLimitPerMinute, TimeSpan.FromMinutes(1)),
                 Limiter(options.RateLimitPerHour, TimeSpan.FromHours(1)));
