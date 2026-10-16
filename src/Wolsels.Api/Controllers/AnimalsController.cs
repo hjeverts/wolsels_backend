@@ -64,6 +64,96 @@ public class AnimalsController(WolselsDbContext db, TimeProvider clock) : Contro
         return NoContent();
     }
 
+    /// <summary>
+    /// Importeert dieren in één keer: bij een fout wordt niets opgeslagen. Dieren worden op naam (zonder
+    /// onderscheid in hoofdletters) gekoppeld; onbekende locaties worden aangemaakt.
+    /// </summary>
+    [HttpPost("import")]
+    public async Task<ActionResult<AnimalImportResult>> Import(AnimalImportRequest request, CancellationToken ct)
+    {
+        var comparer = StringComparer.OrdinalIgnoreCase;
+        var existing = (await db.Animals.ToListAsync(ct)).ToLookup(a => a.Name.Trim(), comparer);
+        var locations = (await db.Locations.ToListAsync(ct))
+            .GroupBy(l => l.Name.Trim(), comparer).ToDictionary(g => g.Key, g => g.First(), comparer);
+        var timesInFile = request.Rows.GroupBy(r => r.Name.Trim(), comparer).ToDictionary(g => g.Key, g => g.Count(), comparer);
+        var newLocations = new List<string>();
+        var now = clock.GetUtcNow();
+        int created = 0, updated = 0, skipped = 0;
+
+        for (var i = 0; i < request.Rows.Count; i++)
+        {
+            var row = request.Rows[i];
+            var prefix = $"Regel {row.Line ?? i + 1}: ";
+            var name = row.Name.Trim();
+            var matches = existing[name].ToList();
+            if (matches.Count > 0 && !request.UpdateExisting)
+            {
+                skipped++;
+                continue;
+            }
+            if (matches.Count > 1)
+            {
+                ModelState.AddModelError(nameof(request.Rows), $"{prefix}er zijn meerdere dieren met de naam \"{name}\", dus het is niet duidelijk welke bijgewerkt moet worden.");
+                continue;
+            }
+            if (matches.Count == 1 && timesInFile[name] > 1)
+            {
+                ModelState.AddModelError(nameof(request.Rows), $"{prefix}\"{name}\" staat meerdere keren in het bestand.");
+                continue;
+            }
+
+            var animal = matches.SingleOrDefault();
+            var isNew = animal is null;
+            if (animal is null)
+            {
+                if ((row.Species.NullIfEmpty() ?? request.DefaultSpecies.NullIfEmpty()) is not { } newSpecies)
+                {
+                    ModelState.AddModelError(nameof(request.Rows), $"{prefix}diersoort ontbreekt.");
+                    continue;
+                }
+                animal = new Animal { Name = name, Species = newSpecies, CreatedAt = now, Active = row.Active ?? true };
+                db.Animals.Add(animal);
+                created++;
+            }
+            else
+            {
+                updated++;
+            }
+            animal.UpdatedAt = now;
+
+            // Een bestaand dier houdt zijn diersoort als die in het bestand leeg is; diersoort is verplicht.
+            if ((isNew || request.Has("species")) && row.Species.NullIfEmpty() is { } species) animal.Species = species;
+            if (isNew || request.Has("breed")) animal.Breed = row.Breed.NullIfEmpty();
+            if (isNew || request.Has("color")) animal.Color = row.Color.NullIfEmpty();
+            if (isNew || request.Has("birthDate")) animal.BirthDate = row.BirthDate;
+            if (isNew || request.Has("notes")) animal.Notes = row.Notes.NullIfEmpty();
+            if (request.Has("active") && row.Active is { } active) animal.Active = active;
+            if (isNew || request.Has("location"))
+            {
+                if (row.Location.NullIfEmpty() is not { } locationName)
+                {
+                    animal.LocationId = null;
+                    animal.Location = null;
+                }
+                else
+                {
+                    if (!locations.TryGetValue(locationName, out var location))
+                    {
+                        location = new Location { Name = locationName, CreatedAt = now, UpdatedAt = now };
+                        db.Locations.Add(location);
+                        locations[locationName] = location;
+                        newLocations.Add(locationName);
+                    }
+                    animal.Location = location;
+                }
+            }
+        }
+
+        if (!ModelState.IsValid) return ValidationProblem(ModelState);
+        await db.SaveChangesAsync(ct);
+        return new AnimalImportResult(created, updated, skipped, newLocations);
+    }
+
     private async Task<ActionResult?> ValidateLocationAsync(AnimalRequest request, CancellationToken ct)
     {
         if (request.LocationId is { } locationId && !await db.Locations.AnyAsync(l => l.Id == locationId, ct))
