@@ -1,8 +1,9 @@
-# Test en bouw de Docker-image en zet hem op ghcr.io/<eigenaar>/wolsels-backend.
+# Tests bij elke pull request en push naar main. Een Docker-image wordt alleen gebouwd voor een
+# versietag (v1.2.3) en komt op ghcr.io/<eigenaar>/wolsels-backend met de tags 1.2.3, 1.2 en, als
+# het de nieuwste versie is, latest.
 #
-# Tags: latest (main), sha-<commit> (om terug te kunnen naar een eerdere versie) en bij een git-tag
-# v1.2.3 ook 1.2.3 en 1.2. Elke maandag wordt de image zonder cache opnieuw gebouwd, zodat
-# beveiligingsupdates van de base-image meekomen.
+# Elke maandag (en handmatig via "Run workflow") wordt de nieuwste versie zonder cache opnieuw
+# gebouwd, zodat beveiligingsupdates van de base-image meekomen.
 name: Image
 
 on:
@@ -30,34 +31,60 @@ jobs:
 
   image:
     needs: test
-    if: github.event_name != 'pull_request'
+    if: github.ref_type == 'tag' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+        with:
+          fetch-depth: 0
+      # Bij een tag: die versie. Anders (wekelijks of handmatig): de nieuwste versietag.
+      - id: version
+        run: |
+          newest=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+          if [ "$GITHUB_REF_TYPE" = tag ]; then tag="$GITHUB_REF_NAME"; else tag="$newest"; fi
+          if [ -z "$tag" ]; then
+            echo "::notice::Nog geen versietag; maak er een met bv. git tag v1.0.0 && git push origin v1.0.0"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git checkout -q "$tag"
+          {
+            echo "tag=$tag"
+            echo "version=${tag#v}"
+            echo "sha=$(git rev-parse HEAD)"
+            echo "latest=$([ "$tag" = "$newest" ] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+      - if: steps.version.outputs.skip != 'true'
+        uses: docker/setup-buildx-action@v3
+      - if: steps.version.outputs.skip != 'true'
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
+      - if: steps.version.outputs.skip != 'true'
+        id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/wolsels-backend
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=short
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-      - uses: docker/build-push-action@v6
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.tag }}
+            type=raw,value=latest,enable=${{ steps.version.outputs.latest }}
+          flavor: latest=false
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.revision=${{ steps.version.outputs.sha }}
+      - if: steps.version.outputs.skip != 'true'
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          no-cache: ${{ github.event_name == 'schedule' }}
+          no-cache: ${{ github.event_name != 'push' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

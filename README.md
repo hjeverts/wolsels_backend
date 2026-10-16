@@ -129,9 +129,18 @@ De frontend heeft dezelfde berekening voor directe feedback; bij opslaan rekent 
 
 ## Docker
 
-GitHub Actions (`.github/workflows/image.yml`) draait bij elke push naar `main` de tests en zet de
-image op `ghcr.io/hjeverts/wolsels-backend` (tags `latest`, `sha-<commit>` en bij een git-tag `v1.2.3`
-ook `1.2.3` en `1.2`). Elke maandag wordt hij opnieuw gebouwd voor updates van de base-image.
+GitHub Actions (`.github/workflows/image.yml`) draait bij elke pull request en push naar `main` de
+tests. Een image wordt alleen gebouwd voor een versietag:
+
+```sh
+git switch main && git pull
+git tag v1.2.0 && git push origin v1.2.0     # of via GitHub: Releases → Draft a new release
+```
+
+De image komt op `ghcr.io/hjeverts/wolsels-backend` met de tags `1.2.0`, `1.2` en, als het de nieuwste
+versie is, `latest`. Gebruik [semver](https://semver.org/lang/nl/): `v1.2.1` voor een bugfix, `v1.3.0`
+voor een nieuwe functie. Elke maandag wordt de nieuwste versie opnieuw gebouwd voor updates van de
+base-image (handmatig: *Actions → Image → Run workflow*).
 
 Zelf bouwen:
 
