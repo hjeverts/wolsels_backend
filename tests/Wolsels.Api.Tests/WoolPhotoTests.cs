@@ -99,9 +99,32 @@ public class WoolPhotoTests(WolselsFactory factory) : IClassFixture<WolselsFacto
         var full = await client.GetAsync($"/api/wools/{wool}/photos/{id}");
         Assert.Equal("image/jpeg", full.Content.Headers.ContentType?.MediaType);
         Assert.Equal(photo, await full.Content.ReadAsByteArrayAsync());
-        Assert.Contains("immutable", full.Headers.CacheControl!.ToString());
+        Assert.True(full.Headers.CacheControl!.NoCache);
+        Assert.True(full.Headers.CacheControl.Private);
         var thumb = await client.GetByteArrayAsync($"/api/wools/{wool}/photos/{id}?size=thumb");
         Assert.Equal(Jpeg(400, 300), thumb);
+    }
+
+    [Fact]
+    public async Task CachedPhoto_IsRevalidated_AndStillChecksAccess()
+    {
+        var client = await factory.CreateUserClientAsync();
+        var wool = await WoolAsync(client);
+        var photo = await UploadOkAsync(client, wool);
+        var url = $"/api/wools/{wool}/photos/{photo}";
+        var etag = (await client.GetAsync(url)).Headers.ETag!;
+        Assert.NotEqual(etag, (await client.GetAsync(url + "?size=thumb")).Headers.ETag);
+
+        HttpRequestMessage Conditional(HttpClient c) =>
+            new(HttpMethod.Get, url) { Headers = { IfNoneMatch = { etag } } };
+        var revalidated = await client.SendAsync(Conditional(client));
+        Assert.Equal(HttpStatusCode.NotModified, revalidated.StatusCode);
+
+        // Iemand anders in dezelfde browser (zelfde cache, zelfde ETag) krijgt de foto niet.
+        var other = await factory.CreateUserClientAsync();
+        Assert.Equal(HttpStatusCode.NotFound, (await other.SendAsync(Conditional(other))).StatusCode);
+        await client.DeleteAsync(url);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.SendAsync(Conditional(client))).StatusCode);
     }
 
     [Fact]
@@ -127,6 +150,20 @@ public class WoolPhotoTests(WolselsFactory factory) : IClassFixture<WolselsFacto
         var wool = await WoolAsync(client);
         for (var i = 0; i < WoolPhotosController.MaxPhotosPerWool; i++) await UploadOkAsync(client, wool);
         Assert.Equal(HttpStatusCode.Conflict, (await UploadAsync(client, wool, Jpeg(800, 600), Jpeg(200, 150))).StatusCode);
+    }
+
+    [Fact]
+    public async Task ConcurrentUploads_CannotExceedTheLimit()
+    {
+        var client = await factory.CreateUserClientAsync();
+        var wool = await WoolAsync(client);
+        for (var i = 0; i < WoolPhotosController.MaxPhotosPerWool - 1; i++) await UploadOkAsync(client, wool);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => UploadAsync(client, wool, Jpeg(800, 600), Jpeg(200, 150))));
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Created);
+        Assert.Equal(4, responses.Count(r => r.StatusCode == HttpStatusCode.Conflict));
+        Assert.Equal(WoolPhotosController.MaxPhotosPerWool,
+            (await client.GetFromJsonAsync<WoolDto>($"/api/wools/{wool}", TestJson.Options))!.PhotoIds.Count);
     }
 
     [Fact]
@@ -181,6 +218,26 @@ public class WoolPhotoTests(WolselsFactory factory) : IClassFixture<WolselsFacto
             .Content.ReadFromJsonAsync<WoolDto>(TestJson.Options);
         Assert.Equal([photo], merged!.PhotoIds);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/wools/{target}/photos/{photo}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task MergingOverThePhotoLimit_IsRejected_AndChangesNothing()
+    {
+        var client = await factory.CreateUserClientAsync();
+        var source = await WoolAsync(client, "Zes");
+        var target = await WoolAsync(client, "Ook zes");
+        for (var i = 0; i < 6; i++)
+        {
+            await UploadOkAsync(client, source);
+            await UploadOkAsync(client, target);
+        }
+
+        var response = await client.PostAsJsonAsync($"/api/wools/{source}/merge", new { targetWoolId = target }, TestJson.Options);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var wools = await client.GetFromJsonAsync<List<WoolDto>>("/api/wools", TestJson.Options);
+        Assert.Equal(6, wools!.Single(w => w.Id == source).PhotoIds.Count);
+        Assert.Equal(6, wools.Single(w => w.Id == target).PhotoIds.Count);
+        Assert.Equal(100m, wools.Single(w => w.Id == target).WeightGrams);
     }
 
     [Fact]

@@ -63,6 +63,24 @@ public class WoolsController(WolselsDbContext db, TimeProvider clock) : Controll
             return ValidationProblem(ModelState);
         }
 
+        // Samen niet meer dan het maximum aan foto's; het slot voorkomt dat een upload er tussendoor komt.
+        await WoolPhotosController.CountLock.WaitAsync(ct);
+        try
+        {
+            if (await db.WoolPhotos.CountAsync(p => p.WoolId == id || p.WoolId == target.Id, ct) > WoolPhotosController.MaxPhotosPerWool)
+                return Problem(statusCode: StatusCodes.Status409Conflict,
+                    title: $"{WoolPhotosController.TooManyPhotos} Verwijder eerst foto's bij een van beide partijen.");
+            await MergeAsync(id, source, target, ct);
+        }
+        finally
+        {
+            WoolPhotosController.CountLock.Release();
+        }
+        return await ToDtoAsync(target, ct);
+    }
+
+    private async Task MergeAsync(int id, Wool source, Wool target, CancellationToken ct)
+    {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         target.WeightGrams += source.WeightGrams;
         target.UpdatedAt = clock.GetUtcNow();
@@ -72,7 +90,6 @@ public class WoolsController(WolselsDbContext db, TimeProvider clock) : Controll
         await db.WoolPhotos.Where(p => p.WoolId == id).ExecuteUpdateAsync(s => s.SetProperty(p => p.WoolId, target.Id), ct);
         await db.Wools.Where(w => w.Id == id).ExecuteDeleteAsync(ct);
         await transaction.CommitAsync(ct);
-        return await ToDtoAsync(target, ct);
     }
 
     private async Task<WoolDto> ToDtoAsync(Wool wool, CancellationToken ct) =>

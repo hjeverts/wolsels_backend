@@ -15,6 +15,14 @@ namespace Wolsels.Api.Controllers;
 public class WoolPhotosController(WolselsDbContext db, TimeProvider clock) : ControllerBase
 {
     public const int MaxPhotosPerWool = 10;
+
+    /// <summary>
+    /// Eén wijziging tegelijk aan het aantal foto's (uploaden, samenvoegen), zodat twee gelijktijdige verzoeken
+    /// niet allebei de laatste plek kunnen innemen. Er draait één backend; een slot in het proces volstaat.
+    /// </summary>
+    public static readonly SemaphoreSlim CountLock = new(1, 1);
+
+    public static readonly string TooManyPhotos = $"Een partij kan maximaal {MaxPhotosPerWool} foto's hebben.";
     /// <summary>Langste zijde van een foto; de frontend verkleint tot 1600 px, met wat ruimte.</summary>
     public const int MaxPhotoSide = 2048;
     public const int MaxThumbnailSide = 512;
@@ -28,33 +36,52 @@ public class WoolPhotosController(WolselsDbContext db, TimeProvider clock) : Con
     public async Task<ActionResult<int>> Upload(int woolId, IFormFile? photo, IFormFile? thumbnail, CancellationToken ct)
     {
         if (await db.Wools.FindAsync([woolId], ct) is null) return NotFound();
-        if (await db.WoolPhotos.CountAsync(p => p.WoolId == woolId, ct) >= MaxPhotosPerWool)
-            return Problem(statusCode: StatusCodes.Status409Conflict, title: $"Een partij kan maximaal {MaxPhotosPerWool} foto's hebben.");
-
         var data = await ReadJpegAsync(photo, nameof(photo), "De foto", MaxPhotoBytes, MaxPhotoSide, ct);
         var thumb = await ReadJpegAsync(thumbnail, nameof(thumbnail), "De miniatuur", MaxThumbnailBytes, MaxThumbnailSide, ct);
         if (data is null || thumb is null) return ValidationProblem(ModelState);
 
         var entity = new WoolPhoto { WoolId = woolId, Data = data, Thumbnail = thumb, CreatedAt = clock.GetUtcNow() };
-        db.WoolPhotos.Add(entity);
-        await db.SaveChangesAsync(ct);
+        await CountLock.WaitAsync(ct);
+        try
+        {
+            if (await db.WoolPhotos.CountAsync(p => p.WoolId == woolId, ct) >= MaxPhotosPerWool)
+                return Problem(statusCode: StatusCodes.Status409Conflict, title: TooManyPhotos);
+            db.WoolPhotos.Add(entity);
+            await db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            CountLock.Release();
+        }
         return CreatedAtAction(nameof(Get), new { woolId, photoId = entity.Id }, entity.Id);
     }
 
     /// <summary>
-    /// De foto, of met <c>?size=thumb</c> de miniatuur. Een foto verandert nooit (alleen toevoegen of
-    /// verwijderen), dus de browser mag hem lang bewaren.
+    /// De foto, of met <c>?size=thumb</c> de miniatuur. De browser mag hem bewaren, maar moet bij elk gebruik
+    /// opnieuw vragen (no-cache): zo gaat ook een foto uit de cache langs de controle op account en huishouden,
+    /// bv. na uitloggen of inloggen als iemand anders. Een foto verandert nooit, dus de ETag is vast en het
+    /// antwoord is dan meestal een kleine 304.
     /// </summary>
     [HttpGet("{photoId:int}")]
     public async Task<IActionResult> Get(int woolId, int photoId, string? size, CancellationToken ct)
     {
+        var thumb = size == "thumb";
         var photos = db.WoolPhotos.AsNoTracking().Where(p => p.Id == photoId && p.WoolId == woolId);
-        var bytes = size == "thumb"
+        var etag = new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{photoId}{(thumb ? "t" : "")}\"");
+        Response.Headers.CacheControl = "private, no-cache";
+
+        if (Request.GetTypedHeaders().IfNoneMatch.Any(t => t.Compare(etag, useStrongComparison: false)))
+        {
+            if (!await photos.AnyAsync(ct)) return NotFound();
+            Response.GetTypedHeaders().ETag = etag;
+            return StatusCode(StatusCodes.Status304NotModified);
+        }
+
+        var bytes = thumb
             ? await photos.Select(p => p.Thumbnail).FirstOrDefaultAsync(ct)
             : await photos.Select(p => p.Data).FirstOrDefaultAsync(ct);
         if (bytes is null) return NotFound();
-        Response.Headers.CacheControl = "private, max-age=31536000, immutable";
-        return File(bytes, "image/jpeg");
+        return File(bytes, "image/jpeg", lastModified: null, entityTag: etag);
     }
 
     [HttpDelete("{photoId:int}")]
