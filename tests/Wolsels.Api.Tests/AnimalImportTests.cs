@@ -162,6 +162,40 @@ public class AnimalImportTests(WolselsFactory factory) : IClassFixture<WolselsFa
     }
 
     [Fact]
+    public async Task InvalidBirthDate_IsReportedWithLineNumber()
+    {
+        var client = await ClientAsync();
+        var response = await client.PostAsJsonAsync("/api/animals/import", new
+        {
+            fields = AllFields,
+            rows = new object[]
+            {
+                new { line = 41, name = "Goed", species = "Konijn", birthDate = "2024-02-29" },
+                new { line = 42, name = "Fout", species = "Konijn", birthDate = "2024-02-30" },
+                new { line = 43, name = "Ook fout", species = "Konijn", birthDate = "30-1-2024" },
+                new { line = 44, name = "Leeg", species = "Konijn", birthDate = "" },
+            },
+        }, TestJson.Options);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var messages = (await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(TestJson.Options))!
+            .Errors.Values.SelectMany(m => m).ToList();
+        Assert.Equal(
+            ["Regel 42: geboortedatum \"2024-02-30\" is geen geldige datum (jjjj-mm-dd).",
+             "Regel 43: geboortedatum \"30-1-2024\" is geen geldige datum (jjjj-mm-dd)."],
+            messages);
+    }
+
+    [Fact]
+    public async Task NullRow_IsAValidationError()
+    {
+        var client = await ClientAsync();
+        var response = await client.PostAsJsonAsync("/api/animals/import",
+            new { rows = new object?[] { new { name = "A", species = "Konijn" }, null } }, TestJson.Options);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task AmbiguousUpdates_AreRejected()
     {
         var client = await ClientAsync();
