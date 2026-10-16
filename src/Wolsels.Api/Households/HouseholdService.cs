@@ -151,7 +151,8 @@ public class HouseholdService(WolselsDbContext db, UserManager<IdentityUser> use
     /// <summary>Verwijdert een huishouden met al zijn gegevens (bij het verwijderen van het laatste lid).</summary>
     public async Task DeleteHouseholdAsync(int householdId, CancellationToken ct)
     {
-        // Volgorde i.v.m. verwijzingen: oogsten -> mengsels (componenten via cascade) -> dieren -> locaties -> wol.
+        // Volgorde i.v.m. verwijzingen: oogsten -> mengsels (componenten via cascade) -> dieren -> locaties -> wol
+        // (foto's via cascade).
         await db.Harvests.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);
         await db.Blends.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);
         await db.Animals.IgnoreQueryFilters().Where(e => e.HouseholdId == householdId).ExecuteDeleteAsync(ct);

@@ -13,10 +13,12 @@ public sealed record WoolDto(
     string? Origin,
     string? Notes,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    /// <summary>Foto's van deze partij, oudste eerst; op te halen via /api/wools/{id}/photos/{photoId}.</summary>
+    IReadOnlyList<int> PhotoIds)
 {
-    public static WoolDto From(Wool w) => new(
-        w.Id, w.Name, w.WoolType, w.Color, w.ColorHex, w.WeightGrams, w.Origin, w.Notes, w.CreatedAt, w.UpdatedAt);
+    public static WoolDto From(Wool w, IReadOnlyList<int> photoIds) => new(
+        w.Id, w.Name, w.WoolType, w.Color, w.ColorHex, w.WeightGrams, w.Origin, w.Notes, w.CreatedAt, w.UpdatedAt, photoIds);
 }
 
 public sealed class WoolRequest

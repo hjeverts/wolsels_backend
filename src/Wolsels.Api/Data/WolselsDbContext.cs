@@ -13,6 +13,7 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
     private int? CurrentHouseholdId => currentUser?.HouseholdId;
 
     public DbSet<Wool> Wools => Set<Wool>();
+    public DbSet<WoolPhoto> WoolPhotos => Set<WoolPhoto>();
     public DbSet<Blend> Blends => Set<Blend>();
     public DbSet<BlendComponent> BlendComponents => Set<BlendComponent>();
     public DbSet<Location> Locations => Set<Location>();
@@ -36,6 +37,7 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
 
         // Elk huishouden ziet alleen zijn eigen gegevens.
         modelBuilder.Entity<Wool>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
+        modelBuilder.Entity<WoolPhoto>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
         modelBuilder.Entity<Blend>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
         modelBuilder.Entity<Location>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
         modelBuilder.Entity<Animal>().HasQueryFilter(e => e.HouseholdId == CurrentHouseholdId);
@@ -79,6 +81,12 @@ public class WolselsDbContext(DbContextOptions<WolselsDbContext> options, ICurre
             e.Property(w => w.ColorHex).HasMaxLength(7);
             e.Property(w => w.Origin).HasMaxLength(200);
             e.Property(w => w.Notes).HasMaxLength(4000);
+        });
+        // Foto's verdwijnen met hun partij, ook bij ExecuteDelete (samenvoegen, huishouden verwijderen).
+        modelBuilder.Entity<WoolPhoto>(e =>
+        {
+            e.HasOne<Wool>().WithMany().HasForeignKey(p => p.WoolId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(p => p.WoolId);
         });
 
         modelBuilder.Entity<Blend>(e =>

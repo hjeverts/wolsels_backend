@@ -18,3 +18,18 @@ public class Wool : IHouseholdData
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }
+
+/// <summary>
+/// Een foto van een partij wol. De browser verkleint de foto vóór het uploaden; de server bewaart een
+/// JPEG (<see cref="Data"/>) en een kleine versie voor lijsten (<see cref="Thumbnail"/>). Wordt samen met de
+/// partij verwijderd.
+/// </summary>
+public class WoolPhoto : IHouseholdData
+{
+    public int Id { get; set; }
+    public int HouseholdId { get; set; }
+    public int WoolId { get; set; }
+    public required byte[] Data { get; set; }
+    public required byte[] Thumbnail { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
