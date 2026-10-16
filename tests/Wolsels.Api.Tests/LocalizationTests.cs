@@ -64,6 +64,25 @@ public partial class LocalizationTests(WolselsFactory factory) : IClassFixture<W
         Assert.Contains(Texts.GetFor("de", "Harvests.ChooseSource"), await response.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task AcceptLanguage_IgnoresLanguagesWithQualityZero()
+    {
+        var client = await factory.CreateUserClientAsync();
+        client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "ja;q=1, de;q=0");
+        var response = await client.PostAsJsonAsync("/api/harvests", new { date = "2026-01-01", weightGrams = 10 });
+        Assert.Contains(Texts.GetFor("nl", "Harvests.ChooseSource"), await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Language_ConcurrentFirstSavesAllSucceed()
+    {
+        var client = await factory.CreateUserClientAsync();
+        var responses = await Task.WhenAll(new[] { "de", "fr", "de", "it", "de", "sv", "pl", "de" }
+            .Select(language => client.PutAsJsonAsync("/api/auth/language", new { language })));
+        Assert.All(responses, r => Assert.Equal(HttpStatusCode.NoContent, r.StatusCode));
+        Assert.Contains((await client.GetFromJsonAsync<Me>("/api/auth/me"))!.Language, new[] { "de", "fr", "it", "sv", "pl" });
+    }
+
     [Theory]
     [InlineData("de-AT", "de")]
     [InlineData("no", "nb")]

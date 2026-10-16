@@ -10,7 +10,9 @@ public sealed class RequestLanguageMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context)
     {
+        // q=0 means "not acceptable" (RFC 9110), so such a language must never be chosen.
         var language = context.Request.GetTypedHeaders().AcceptLanguage
+            .Where(l => (l.Quality ?? 1) > 0)
             .OrderByDescending(l => l.Quality ?? 1)
             .Select(l => Texts.Normalize(l.Value.Value))
             .FirstOrDefault(l => l is not null) ?? Texts.DefaultLanguage;
